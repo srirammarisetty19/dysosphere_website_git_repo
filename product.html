@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SphereX Product — AI + NAS Capabilities | DysoSphere</title>
+    <meta name="description" content="SphereX: local LLM inference, retrieval-augmented generation, intelligent media analysis, semantic file search, hardware-accelerated encryption, and multi-device sync — all in one appliance.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar" id="navbar"><div class="nav-container">
+        <a href="index.html" class="nav-logo"><img src="images/DS.svg" alt="DS" style="height:28px;width:auto"><span class="logo-separator"></span><span class="logo-product">SphereX</span></a>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="product.html" class="active">Product</a></li>
+            <li><a href="solutions.html">Solutions</a></li>
+            <li><a href="about.html">About</a></li>
+            <li><a href="contact.html" class="nav-cta">Get in Touch</a></li>
+        </ul>
+        <button class="nav-toggle" id="navToggle" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div></nav>
+
+    <section class="page-hero">
+        <div class="hero-gradient"></div>
+        <div class="page-hero-content">
+            <span class="section-tag animate-in">Product</span>
+            <h1 class="hero-title animate-in d1">Everything You Need.<br><span class="gradient-text">Nothing You Don't Trust.</span></h1>
+            <p class="hero-subtitle animate-in d2">A single appliance that combines autonomous AI inference with enterprise-grade storage. Built for business decision-makers who demand performance without compromise.</p>
+        </div>
+    </section>
+
+    <!-- AI CAPABILITIES -->
+    <section class="capabilities" id="ai-features">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">AI Engine</span>
+                <h2 class="section-title">Intelligent by Design, <span class="gradient-text">Private by Default</span></h2>
+                <p class="section-subtitle">SphereX runs a full AI stack on-device — from large language models to computer vision — without sending a single byte to the cloud.</p>
+            </div>
+
+            <div class="capability-grid">
+                <div class="capability-card reveal">
+                    <div class="capability-icon">🧠</div>
+                    <h3>Local LLM Inference</h3>
+                    <p>Run large language models directly on SphereX hardware. Ask questions, generate reports, summarize documents, and automate workflows — all powered by on-device GPU/NPU acceleration with zero external API calls.</p>
+                    <ul class="capability-bullets">
+                        <li>Supports Gemma, LLaMA, Qwen, Mistral, and any GGUF-compatible model</li>
+                        <li>Hardware-accelerated transformers with KV cache offloading to NVMe</li>
+                        <li>Massive context windows for long-document analysis</li>
+                        <li>Zero per-token charges — unlimited inference at no ongoing cost</li>
+                    </ul>
+                </div>
+
+                <div class="capability-card reveal">
+                    <div class="capability-icon">📄</div>
+                    <h3>Retrieval-Augmented Generation</h3>
+                    <p>SphereX indexes every document on your storage using an integrated vector database. Query your internal knowledge base in natural language and receive precise, citation-backed answers — entirely offline.</p>
+                    <ul class="capability-bullets">
+                        <li>Proprietary vector database indexes PDFs, spreadsheets, images, and text</li>
+                        <li>Natural language queries with source-cited responses</li>
+                        <li>Ideal for HR policies, legal documents, compliance archives, and SOPs</li>
+                        <li>All indexing and retrieval happens on-premises</li>
+                    </ul>
+                </div>
+
+                <div class="capability-card reveal">
+                    <div class="capability-icon">📸</div>
+                    <h3>Intelligent Media Analysis</h3>
+                    <p>Drop thousands of photos or hours of video onto your SphereX. It automatically performs dense face-clustering, scene recognition, object detection, and metadata tagging — with zero user input required.</p>
+                    <ul class="capability-bullets">
+                        <li>AuraFace-powered face recognition with automatic clustering</li>
+                        <li>Search photos by describing scenes: "sunset on the beach" or "safety violation on site"</li>
+                        <li>Automatic captioning and smart album creation</li>
+                        <li>No face data or images ever leave your device</li>
+                    </ul>
+                </div>
+
+                <div class="capability-card reveal">
+                    <div class="capability-icon">🤖</div>
+                    <h3>Autonomous Task Execution</h3>
+                    <p>Schedule recurring AI agents that act on your behalf — morning briefings, expense digests, email intelligence, web research, and automated reports. SphereX executes tasks autonomously on a schedule you define.</p>
+                    <ul class="capability-bullets">
+                        <li>Natural language scheduling: "every Monday at 9am" or "last Friday of the month"</li>
+                        <li>Automated web research with synthesized summaries</li>
+                        <li>Email parsing, expense extraction, and bill tracking</li>
+                        <li>Notifications via WhatsApp, Telegram, or in-app</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- NAS CAPABILITIES -->
+    <section class="capabilities" id="nas-features" style="background:var(--bg-2)">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Storage Engine</span>
+                <h2 class="section-title">Enterprise Storage That <span class="gradient-text">Thinks</span></h2>
+                <p class="section-subtitle">Not just a hard drive with a network port. SphereX understands what's stored on it — and makes it searchable, organized, and intelligent.</p>
+            </div>
+
+            <div class="capability-grid">
+                <div class="capability-card reveal">
+                    <div class="capability-icon">🔍</div>
+                    <h3>Semantic File Search</h3>
+                    <p>Search by describing what you're looking for, not the filename. SphereX reads the content of your documents, PDFs, spreadsheets, and even images — and returns results ranked by relevance.</p>
+                    <ul class="capability-bullets">
+                        <li>Content-aware search across all file types</li>
+                        <li>Vector-indexed for sub-second retrieval across terabytes</li>
+                        <li>"Find the invoice from the electrician in March" works instantly</li>
+                        <li>No other consumer or prosumer NAS offers this capability</li>
+                    </ul>
+                </div>
+
+                <div class="capability-card reveal">
+                    <div class="capability-icon">🔄</div>
+                    <h3>Multi-Device Auto Sync</h3>
+                    <p>Every photo taken, every document saved — automatically backed up to SphereX over your local network. Works with iPhone, Android, Mac, and Windows. No cloud uploads, no storage limits, no monthly fees.</p>
+                    <ul class="capability-bullets">
+                        <li>Continuous background sync over WiFi or LAN</li>
+                        <li>Apple Time Machine and Windows File History compatible</li>
+                        <li>Version history and incremental snapshots for every file</li>
+                        <li>Replaces iCloud, Google One, and Dropbox entirely</li>
+                    </ul>
+                </div>
+
+                <div class="capability-card reveal">
+                    <div class="capability-icon">🌐</div>
+                    <h3>Secure Remote Access</h3>
+                    <p>Access your files from anywhere — at the office, on the road, or across the world. Encrypted end-to-end with direct tunneling to your SphereX. No cloud relay service, no third-party intermediary.</p>
+                    <ul class="capability-bullets">
+                        <li>Zero-knowledge encrypted tunnel to your home or office device</li>
+                        <li>Mobile and desktop apps with seamless file browsing</li>
+                        <li>Share files with temporary secure links</li>
+                        <li>Works on any network without port forwarding</li>
+                    </ul>
+                </div>
+
+                <div class="capability-card reveal">
+                    <div class="capability-icon">🔐</div>
+                    <h3>Hardware-Accelerated Encryption</h3>
+                    <p>AES-256 encryption at rest and in transit, executed on dedicated hardware. Immutable snapshots protect against ransomware. Zero outbound telemetry — your SphereX never phones home.</p>
+                    <ul class="capability-bullets">
+                        <li>Full-disk AES-256 encryption with hardware acceleration</li>
+                        <li>Immutable snapshot protection against ransomware attacks</li>
+                        <li>Zero telemetry — no analytics, no usage data collected</li>
+                        <li>Air-gap capable for high-security environments</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- WHAT'S INSIDE -->
+    <section class="spec-highlights" id="specs">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">What's Inside</span>
+                <h2 class="section-title">Built for <span class="gradient-text">Serious Workloads</span></h2>
+                <p class="section-subtitle">Purpose-built hardware designed from the silicon up to handle continuous AI inference alongside petabyte-scale storage.</p>
+            </div>
+            <div class="spec-grid">
+                <div class="spec-card reveal">
+                    <div class="spec-icon">⚡</div>
+                    <h4>GPU / NPU Acceleration</h4>
+                    <p>Dedicated neural processing units for sustained AI inference without thermal throttling. Handles LLMs, vision models, and embeddings concurrently.</p>
+                </div>
+                <div class="spec-card reveal">
+                    <div class="spec-icon">💾</div>
+                    <h4>Tiered Storage</h4>
+                    <p>NVMe cache tier for hot data and AI workloads, backed by high-capacity HDD arrays for archival. AI-driven data tiering moves files automatically.</p>
+                </div>
+                <div class="spec-card reveal">
+                    <div class="spec-icon">🌐</div>
+                    <h4>Multi-Gigabit Networking</h4>
+                    <p>High-speed networking ready for saturating local workstation connections. Eliminates bottlenecks between your devices and your data.</p>
+                </div>
+                <div class="spec-card reveal">
+                    <div class="spec-icon">🔧</div>
+                    <h4>Open Software Stack</h4>
+                    <p>Run any GGUF model, connect any protocol, integrate any workflow. Built on open standards — no proprietary lock-in. Your hardware, your rules.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOR HOME USERS -->
+    <section class="home-users" id="home-users">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">For Home Users</span>
+                <h2 class="section-title">Also Perfect for <span class="gradient-text">Your Home</span></h2>
+                <p class="section-subtitle">SphereX isn't only for enterprises. It's the smartest thing you can put on your shelf at home — replacing cloud subscriptions with a device you own.</p>
+            </div>
+            <div class="home-users-grid">
+                <div class="home-user-card reveal">
+                    <div class="hu-icon">📸</div>
+                    <h3>Your Photo Memories, Private</h3>
+                    <p>Store every family photo and video locally. Search by describing scenes or faces. Create smart albums automatically. No Google or Apple required.</p>
+                </div>
+                <div class="home-user-card reveal">
+                    <div class="hu-icon">🤖</div>
+                    <h3>Your Personal AI Assistant</h3>
+                    <p>A private ChatGPT alternative that remembers your preferences, tracks your expenses, researches the web, and sends you morning briefings — with zero data leaving your home.</p>
+                </div>
+                <div class="home-user-card reveal">
+                    <div class="hu-icon">🔄</div>
+                    <h3>Your Family Backup</h3>
+                    <p>Every phone, laptop, and tablet in your household backs up automatically to SphereX. No storage limits. No monthly fees. No "you've run out of space" warnings.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+        <div class="container">
+            <div class="cta-card">
+                <div class="cta-glow"></div>
+                <h2>Ready to Own Your Intelligence Stack?</h2>
+                <p>Reach out to learn about pricing, configurations, and deployment options for your organization or home.</p>
+                <div class="cta-actions">
+                    <a href="contact.html" class="btn btn-primary btn-lg">Contact Us</a>
+                    <a href="solutions.html" class="btn btn-ghost btn-lg">See Industry Solutions →</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer"><div class="container"><div class="footer-inner">
+        <div class="footer-brand"><img src="images/DS.svg" alt="DS" style="height:22px;width:auto"><span>DysoSphere</span></div>
+        <div class="footer-links"><a href="index.html">Home</a><a href="product.html">Product</a><a href="solutions.html">Solutions</a><a href="about.html">About</a><a href="contact.html">Contact</a></div>
+        <p class="footer-copy">&copy; 2026 DysoSphere &bull; SphereX — Your AI, Your Data, Your Hardware</p>
+    </div></div></footer>
+    <script src="script.js"></script>
+</body>
+</html>
