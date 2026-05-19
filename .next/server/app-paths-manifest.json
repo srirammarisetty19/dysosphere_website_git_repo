@@ -1,0 +1,14 @@
+{
+  "/(app)/artifacts/page": "app/(app)/artifacts/page.js",
+  "/(app)/calendar/page": "app/(app)/calendar/page.js",
+  "/(app)/chat/page": "app/(app)/chat/page.js",
+  "/(app)/reminders/page": "app/(app)/reminders/page.js",
+  "/(app)/settings/page": "app/(app)/settings/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(auth)/register/page": "app/(auth)/register/page.js",
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/[...proxy]/route": "app/api/[...proxy]/route.js",
+  "/api/chat/stream/route": "app/api/chat/stream/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js"
+}
