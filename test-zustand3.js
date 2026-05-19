@@ -1,0 +1,27 @@
+const { create } = require('zustand');
+const { persist, createJSONStorage } = require('zustand/middleware');
+
+const dummyStorage = {
+  getItem: (name) => '{"state":{"val":1},"version":0}',
+  setItem: (name, value) => {},
+  removeItem: (name) => {}
+};
+
+const useStore = create(
+  persist(
+    (set) => ({ val: 0 }),
+    {
+      name: 'test',
+      storage: createJSONStorage(() => dummyStorage),
+      onRehydrateStorage: () => (state, error) => {
+        if (error) console.error("Hydration error:", error);
+        console.log("Is useStore defined?", typeof useStore);
+        try {
+          useStore.setState({ val: 2 });
+        } catch (e) {
+          console.error("Error setting state:", e.message);
+        }
+      }
+    }
+  )
+);

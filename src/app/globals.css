@@ -1,0 +1,244 @@
+@import "tailwindcss";
+
+/* ── Design Tokens ─────────────────────────────────────────────────────── */
+@theme inline {
+  /* Background hierarchy */
+  --color-bg-primary: #0A0A0F;
+  --color-bg-secondary: #0D1117;
+  --color-bg-tertiary: #161B22;
+  --color-bg-elevated: #1A1A24;
+  --color-bg-glass: rgba(255, 255, 255, 0.04);
+  --color-bg-glass-border: rgba(255, 255, 255, 0.08);
+
+  /* Text hierarchy */
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: rgba(255, 255, 255, 0.7);
+  --color-text-tertiary: rgba(255, 255, 255, 0.4);
+  --color-text-muted: rgba(255, 255, 255, 0.2);
+
+  /* Accent colors (matching Flutter app) */
+  --color-accent-cyan: #00BCD4;
+  --color-accent-purple: #7C4DFF;
+  --color-accent-teal: #4DD0E1;
+  --color-accent-blue: #3476FC;
+  --color-accent-green: #81C784;
+  --color-accent-red: #FF6B6B;
+  --color-accent-orange: #FF8A65;
+
+  /* Borders */
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-default: rgba(255, 255, 255, 0.1);
+  --color-border-accent: rgba(0, 188, 212, 0.25);
+
+  /* Font */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+/* ── Global Styles ─────────────────────────────────────────────────────── */
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Custom Scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Gradient Utilities ────────────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-purple));
+}
+
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-purple));
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  pointer-events: none;
+}
+
+/* ── Glass Card ────────────────────────────────────────────────────────── */
+.glass-card {
+  background: var(--color-bg-glass);
+  border: 1px solid var(--color-bg-glass-border);
+  border-radius: 1rem;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Shimmer Animation ─────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-accent-cyan) 0%,
+    var(--color-accent-purple) 50%,
+    var(--color-accent-cyan) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.2s ease-in-out infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.shimmer-icon {
+  background: linear-gradient(
+    90deg,
+    var(--color-accent-cyan) 0%,
+    var(--color-accent-purple) 50%,
+    var(--color-accent-cyan) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.2s ease-in-out infinite;
+}
+
+/* ── Pulse Animation ───────────────────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.pulse-glow {
+  animation: pulse-glow 0.9s ease-in-out infinite;
+}
+
+/* ── Bounce Dots ───────────────────────────────────────────────────────── */
+@keyframes bounce-dot {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-4px); }
+}
+
+.bounce-dot { animation: bounce-dot 1.2s ease-in-out infinite; }
+.bounce-dot-1 { animation-delay: 0s; }
+.bounce-dot-2 { animation-delay: 0.15s; }
+.bounce-dot-3 { animation-delay: 0.3s; }
+
+/* ── Code Block Styles (Gemini-style) ─────────────────────────────────── */
+.gemini-prose pre {
+  background: transparent !important;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+}
+
+.gemini-prose code {
+  font-family: var(--font-mono), 'Menlo', 'Consolas', monospace;
+}
+
+/* ── Dimmed Mode (for thinking content) ───────────────────────────────── */
+.gemini-prose.dimmed {
+  opacity: 0.4;
+  font-style: italic;
+  font-size: 0.8125rem;
+}
+
+.gemini-prose.dimmed p,
+.gemini-prose.dimmed li {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+/* ── Thinking Block Animation ──────────────────────────────────────────── */
+@keyframes thinking-border {
+  0% { border-color: rgba(0, 188, 212, 0.15); }
+  50% { border-color: rgba(0, 188, 212, 0.35); }
+  100% { border-color: rgba(0, 188, 212, 0.15); }
+}
+
+.thinking-active {
+  animation: thinking-border 2s ease-in-out infinite;
+}
+
+/* ── Selection ─────────────────────────────────────────────────────────── */
+::selection {
+  background: rgba(0, 188, 212, 0.3);
+  color: white;
+}
+
+/* ── Focus Ring ────────────────────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--color-accent-cyan);
+  outline-offset: 2px;
+}
+
+/* ── hljs Overrides ───────────────────────────────────────────────────── */
+.hljs {
+  background: transparent !important;
+}
+
+/* ── Chat Message Fade In ─────────────────────────────────────────────── */
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Slide In From Top ────────────────────────────────────────────────── */
+@keyframes slide-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation: slide-in-top 0.3s ease-out;
+}
+
+/* ── Keyboard Shortcut Keys ───────────────────────────────────────────── */
+kbd {
+  font-family: var(--font-mono), 'Menlo', monospace;
+}
+

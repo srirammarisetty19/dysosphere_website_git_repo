@@ -1,0 +1,162 @@
+"use client";
+
+// ============================================================================
+// App Layout — Shared sidebar + content layout for all (app) routes
+// The sidebar persists across chat, calendar, reminders, settings navigation
+// Includes server connectivity monitor (offline ribbon like the Flutter app)
+// ============================================================================
+
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuthStore } from "@/stores/auth-store";
+import { apiClient } from "@/lib/api-client";
+import { AppSidebar } from "@/components/app-sidebar";
+import { Loader2, WifiOff, RefreshCw } from "lucide-react";
+
+function AppLayoutInner({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, _hasHydrated } = useAuthStore();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isServerOnline, setIsServerOnline] = useState(true);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+
+  // ── Gateway Auth Handoff (OAuth redirect pattern) ────────────────────
+  useEffect(() => {
+    const token = searchParams.get("token");
+    const server = searchParams.get("server");
+    const username = searchParams.get("username");
+
+    if (token && server && username) {
+      const email = searchParams.get("email") || "";
+      const uid = searchParams.get("uid") || "";
+      const normalizedServer = server.replace(/\/+$/, "");
+
+      apiClient.setToken(token);
+      apiClient.setServerUrl(normalizedServer);
+      try { localStorage.setItem("spherex_server", normalizedServer); } catch { /* ok */ }
+
+      const account = {
+        id: `${username}@${normalizedServer}`,
+        username,
+        email,
+        serverUrl: normalizedServer,
+        token,
+      };
+      useAuthStore.setState({
+        user: { id: uid || "gateway", username, email },
+        activeAccount: account,
+        accounts: [account],
+        _hasHydrated: true,
+      });
+
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [searchParams]);
+
+  // Hydration safety net
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!useAuthStore.getState()._hasHydrated) {
+        useAuthStore.setState({ _hasHydrated: true });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Listen for sidebar toggle events from child pages
+  useEffect(() => {
+    const handler = () => setSidebarOpen((v) => !v);
+    window.addEventListener("toggle-sidebar", handler);
+    return () => window.removeEventListener("toggle-sidebar", handler);
+  }, []);
+
+  // ── Server Connectivity Monitor (Google Drive / Slack pattern) ───────
+  // Background health check every 15s. Shows persistent ribbon when offline.
+  const checkHealth = useCallback(async () => {
+    try {
+      const online = await apiClient.healthCheck();
+      setIsServerOnline(online);
+    } catch {
+      setIsServerOnline(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Initial check after 2s (give time for auth hydration)
+    const initialTimer = setTimeout(checkHealth, 2000);
+    // Periodic check every 15 seconds
+    const interval = setInterval(checkHealth, 15000);
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [checkHealth]);
+
+  const handleRetry = async () => {
+    setIsCheckingHealth(true);
+    await checkHealth();
+    setIsCheckingHealth(false);
+  };
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (_hasHydrated && !user) {
+      router.push("/login");
+    }
+  }, [_hasHydrated, user, router]);
+
+  // Show loading during hydration
+  if (!_hasHydrated || !user) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[var(--color-bg-primary)]">
+        <Loader2 className="animate-spin text-white/20" size={28} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-[var(--color-bg-primary)] overflow-hidden">
+      {/* Offline Ribbon — Persistent server connectivity banner */}
+      {!isServerOnline && (
+        <div className="flex items-center justify-center gap-3 px-4 py-2 bg-red-500/10 border-b border-red-500/20 shrink-0 animate-in">
+          <WifiOff size={14} className="text-red-400" />
+          <span className="text-red-400 text-sm font-medium">
+            Server is offline
+          </span>
+          <span className="text-red-400/50 text-xs hidden sm:inline">
+            — Check your SphereX device connection
+          </span>
+          <button
+            onClick={handleRetry}
+            disabled={isCheckingHealth}
+            className="ml-2 flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors disabled:opacity-40"
+          >
+            <RefreshCw size={12} className={isCheckingHealth ? "animate-spin" : ""} />
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Main layout */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <AppSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={
+      <div className="h-screen w-screen flex items-center justify-center bg-[var(--color-bg-primary)]">
+        <Loader2 className="animate-spin text-white/20" size={28} />
+      </div>
+    }>
+      <AppLayoutInner>{children}</AppLayoutInner>
+    </Suspense>
+  );
+}
