@@ -2,19 +2,19 @@
 // Sphere AI — API Client
 // TypeScript port of api_service.dart
 //
-// Architecture (industry standard — same pattern as Plex, Figma, Slack):
-//   The web app runs on any host (localhost, dysosphere.com, etc.) and calls
-//   the user's SphereX server DIRECTLY cross-origin. Nginx on the SphereX
-//   appliance has full CORS headers enabled for this exact pattern.
+// Architecture (Cloudflare Tunnel — single-origin):
+//   The web app and API are both served from dysosphere.ai via Nginx.
+//   Nginx routes /api/ai/* to the AI FastAPI backend and everything else
+//   to the Next.js website. Since both are on the same origin, there are
+//   no cross-origin issues.
 //
 //   Flow:
-//     1. Gateway (static site) authenticates → stores serverUrl + token
-//     2. This client reads serverUrl → calls https://<server>/api/ai/<path>
+//     1. Gateway authenticates → stores serverUrl + token in localStorage
+//     2. This client calls /api/ai/<path> (same-origin, no CORS needed)
 //     3. Nginx strips /api/ai/ → forwards to AI FastAPI on :8001
 //
-//   This eliminates the need for a local BFF proxy. The server URL is
-//   per-user (each user has their own SphereX appliance), so a fixed
-//   proxy target doesn't work — direct calls are the correct pattern.
+//   For development or multi-server setups, the serverUrl can be set to
+//   a different SphereX appliance URL (cross-origin, CORS enabled on Nginx).
 // ============================================================================
 
 import type {

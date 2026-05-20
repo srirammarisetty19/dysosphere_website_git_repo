@@ -71,7 +71,7 @@
                 type="text"
                 class="gw-input"
                 id="gwServerInput"
-                placeholder="e.g. 192.168.1.100 or https://spherex.company.com"
+                placeholder="e.g. dysosphere.ai or 192.168.1.100"
                 autocomplete="url"
                 spellcheck="false"
               />
@@ -347,13 +347,10 @@
           showToast('Server did not respond. Check the address and ensure it is running.', 'error');
         } else {
           // "Failed to fetch" can mean CORS blocked OR truly unreachable.
-          // For self-signed SSL certs, the browser will also block with this error.
-          // Show a helpful message about SSL.
           statusEl.className = 'gw-status error';
           statusEl.innerHTML = '<span class="gw-status-dot"></span> Could not reach server';
           showToast(
-            'Cannot connect. If using HTTPS with a self-signed certificate, ' +
-            'visit your server URL directly first and accept the certificate.',
+            'Cannot connect. Check the address and ensure the server is running.',
             'warning',
             6000
           );
@@ -575,8 +572,10 @@
       email: state.authEmail || '',
       uid: state.authUserId || '',
     });
-    // Redirect directly to the web app — no intermediate "You're In" screen
-    window.location.href = `http://localhost:3000/chat?${params.toString()}`;
+    // Redirect to the web app on the same origin (Cloudflare Tunnel serves both)
+    // If running on localhost during dev, use relative path.
+    const chatPath = `/chat?${params.toString()}`;
+    window.location.href = chatPath;
   }
 
   // ── Toggle Auth Tabs ─────────────────────────────────────────────────
@@ -718,7 +717,7 @@
         email: state.authEmail || '',
         uid: state.authUserId || '',
       });
-      window.open(`http://localhost:3000/chat?${params.toString()}`, '_blank');
+      window.open(`/chat?${params.toString()}`, '_blank');
     });
     document.getElementById('gwSignOut').addEventListener('click', () => {
       try {
