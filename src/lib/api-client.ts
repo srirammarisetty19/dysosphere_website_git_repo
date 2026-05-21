@@ -435,6 +435,7 @@ class ApiClient {
       images?: string[];
       isTemporary?: boolean;
       description?: string;
+      signal?: AbortSignal;
     }
   ): AsyncGenerator<StreamEvent> {
     const token = this.getToken();
@@ -455,6 +456,7 @@ class ApiClient {
         is_temporary: options?.isTemporary,
         description: options?.description,
       }),
+      signal: options?.signal,
     });
 
     if (!response.ok) {

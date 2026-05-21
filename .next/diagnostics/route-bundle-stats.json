@@ -1,13 +1,13 @@
 [
   {
     "route": "/chat",
-    "firstLoadUncompressedJsBytes": 910928,
+    "firstLoadUncompressedJsBytes": 912712,
     "firstLoadChunkPaths": [
       ".next/static/chunks/01xlw8hd842-c.js",
       ".next/static/chunks/0t2xr05rlu96l.js",
-      ".next/static/chunks/0hji14pwt_mzy.js",
-      ".next/static/chunks/0~~iti4gk-71i.js",
-      ".next/static/chunks/0bt5vkh~k9tx6.js",
+      ".next/static/chunks/0acwvb_l-nvqf.js",
+      ".next/static/chunks/0_-z4_h.9id_x.js",
+      ".next/static/chunks/0blsidf6rj2_-.js",
       ".next/static/chunks/0qmh881w772ef.js",
       ".next/static/chunks/02i7dfk78~t~2.js",
       ".next/static/chunks/0c7h~x4_chf35.js",
@@ -17,12 +17,12 @@
   },
   {
     "route": "/settings",
-    "firstLoadUncompressedJsBytes": 577839,
+    "firstLoadUncompressedJsBytes": 579150,
     "firstLoadChunkPaths": [
       ".next/static/chunks/01xlw8hd842-c.js",
       ".next/static/chunks/0t2xr05rlu96l.js",
-      ".next/static/chunks/0hji14pwt_mzy.js",
-      ".next/static/chunks/0p003.adojqo9.js",
+      ".next/static/chunks/0acwvb_l-nvqf.js",
+      ".next/static/chunks/11__0ip45nl-7.js",
       ".next/static/chunks/0qmh881w772ef.js",
       ".next/static/chunks/02i7dfk78~t~2.js",
       ".next/static/chunks/0c7h~x4_chf35.js",
@@ -32,12 +32,12 @@
   },
   {
     "route": "/reminders",
-    "firstLoadUncompressedJsBytes": 569372,
+    "firstLoadUncompressedJsBytes": 570683,
     "firstLoadChunkPaths": [
       ".next/static/chunks/01xlw8hd842-c.js",
       ".next/static/chunks/0t2xr05rlu96l.js",
-      ".next/static/chunks/0hji14pwt_mzy.js",
-      ".next/static/chunks/178l9zj8h80m9.js",
+      ".next/static/chunks/0acwvb_l-nvqf.js",
+      ".next/static/chunks/03wnhu_pv2q5j.js",
       ".next/static/chunks/0qmh881w772ef.js",
       ".next/static/chunks/02i7dfk78~t~2.js",
       ".next/static/chunks/0c7h~x4_chf35.js",
@@ -47,12 +47,12 @@
   },
   {
     "route": "/calendar",
-    "firstLoadUncompressedJsBytes": 567674,
+    "firstLoadUncompressedJsBytes": 568985,
     "firstLoadChunkPaths": [
       ".next/static/chunks/01xlw8hd842-c.js",
       ".next/static/chunks/0t2xr05rlu96l.js",
-      ".next/static/chunks/0hji14pwt_mzy.js",
-      ".next/static/chunks/0f1sf.uqnqzee.js",
+      ".next/static/chunks/0acwvb_l-nvqf.js",
+      ".next/static/chunks/0gf_yv_jrph4..js",
       ".next/static/chunks/0qmh881w772ef.js",
       ".next/static/chunks/02i7dfk78~t~2.js",
       ".next/static/chunks/0c7h~x4_chf35.js",
@@ -62,12 +62,12 @@
   },
   {
     "route": "/artifacts",
-    "firstLoadUncompressedJsBytes": 566680,
+    "firstLoadUncompressedJsBytes": 567509,
     "firstLoadChunkPaths": [
       ".next/static/chunks/01xlw8hd842-c.js",
       ".next/static/chunks/0t2xr05rlu96l.js",
-      ".next/static/chunks/0hji14pwt_mzy.js",
-      ".next/static/chunks/0nhpaoh532sik.js",
+      ".next/static/chunks/0acwvb_l-nvqf.js",
+      ".next/static/chunks/0j0as.o.ja9s-.js",
       ".next/static/chunks/0qmh881w772ef.js",
       ".next/static/chunks/02i7dfk78~t~2.js",
       ".next/static/chunks/0c7h~x4_chf35.js",
@@ -77,11 +77,11 @@
   },
   {
     "route": "/login",
-    "firstLoadUncompressedJsBytes": 546622,
+    "firstLoadUncompressedJsBytes": 546639,
     "firstLoadChunkPaths": [
       ".next/static/chunks/01xlw8hd842-c.js",
       ".next/static/chunks/0t2xr05rlu96l.js",
-      ".next/static/chunks/00-.onhz_oz0u.js",
+      ".next/static/chunks/00mwww52c2u22.js",
       ".next/static/chunks/0qmh881w772ef.js",
       ".next/static/chunks/02i7dfk78~t~2.js",
       ".next/static/chunks/0c7h~x4_chf35.js",
@@ -91,11 +91,11 @@
   },
   {
     "route": "/register",
-    "firstLoadUncompressedJsBytes": 543468,
+    "firstLoadUncompressedJsBytes": 543485,
     "firstLoadChunkPaths": [
       ".next/static/chunks/01xlw8hd842-c.js",
       ".next/static/chunks/0t2xr05rlu96l.js",
-      ".next/static/chunks/0lsatrtm0tu5_.js",
+      ".next/static/chunks/0w_xolu5otb9k.js",
       ".next/static/chunks/0qmh881w772ef.js",
       ".next/static/chunks/02i7dfk78~t~2.js",
       ".next/static/chunks/0c7h~x4_chf35.js",

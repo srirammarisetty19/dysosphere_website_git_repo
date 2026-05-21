@@ -298,16 +298,30 @@ function ChatSection({ onClose }: { onClose: () => void }) {
 
 // ── Server status indicator ────────────────────────────────────────────
 function ServerStatus() {
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const server = typeof window !== "undefined" ? localStorage.getItem("spherex_server") : null;
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ online: boolean }>).detail;
+      setIsOnline(detail.online);
+    };
+    window.addEventListener("server-health-update", handler);
+    return () => window.removeEventListener("server-health-update", handler);
+  }, []);
+
   if (!server) return null;
 
   return (
     <div className="border-t border-white/[0.04] px-4 py-3 shrink-0">
       <div className="flex items-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
+        <span className={`w-1.5 h-1.5 rounded-full ${isOnline === false ? "bg-red-400/60" : "bg-emerald-400/60"}`} />
         <span className="text-white/20 text-[10px] truncate">
           {server.replace(/^https?:\/\//, "")}
         </span>
+        {isOnline === false && (
+          <span className="text-red-400/50 text-[9px] ml-auto">offline</span>
+        )}
       </div>
     </div>
   );

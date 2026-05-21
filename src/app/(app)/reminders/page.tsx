@@ -16,6 +16,7 @@ import {
   Loader2,
   Repeat,
   AlertCircle,
+  Menu,
 } from "lucide-react";
 import { useHeartbeatsStore, describeCron } from "@/stores/heartbeats-store";
 import type { Heartbeat } from "@/lib/types";
@@ -34,6 +35,13 @@ export default function RemindersPage() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 h-14 border-b border-white/[0.04] shrink-0">
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("toggle-sidebar"))}
+            className="lg:hidden p-2 -ml-2 mr-1 rounded-lg text-white/50 hover:text-white/80 hover:bg-white/5 transition-colors"
+            aria-label="Open sidebar"
+          >
+            <Menu size={22} />
+          </button>
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#00BCD4] to-[#7C4DFF] flex items-center justify-center">
             <Zap size={15} className="text-white" />
           </div>

@@ -21,7 +21,7 @@
 
   // ── State ────────────────────────────────────────────────────────────
   const state = {
-    currentStep: 1,       // 1=connect, 2=select, 3=auth
+    currentStep: 2,       // Start at service select (no more step 1)
     serverUrl: '',
     authMode: 'login',    // 'login' | 'register'
     selectedService: null, // 'ai' | 'nas'
@@ -49,45 +49,10 @@
       <button class="gateway-close" id="gatewayClose" aria-label="Close">&times;</button>
       <div class="gateway-container" id="gatewayContainer">
 
-        <!-- ═══ STEP 1: SERVER CONNECTION ═══ -->
-        <div class="gateway-step active" id="gwStep1">
-          <div class="gw-steps-indicator">
-            <div class="gw-step-dot active"></div>
-            <div class="gw-step-line"></div>
-            <div class="gw-step-dot"></div>
-            <div class="gw-step-line"></div>
-            <div class="gw-step-dot"></div>
-          </div>
-          <div class="gateway-brand">
-            <div class="gateway-logo">⬡</div>
-            <h2>Connect to SphereX</h2>
-            <p>Enter your SphereX server address to access AI and NAS services</p>
-          </div>
-          <div class="gw-card">
-            <div id="gwConnStatus" style="display:none"></div>
-            <div class="gw-server-input-wrap">
-              <span class="gw-input-icon">🌐</span>
-              <input
-                type="text"
-                class="gw-input"
-                id="gwServerInput"
-                placeholder="e.g. dysosphere.ai or 192.168.1.100"
-                autocomplete="url"
-                spellcheck="false"
-              />
-            </div>
-            <div class="gw-input-hint">Your SphereX appliance IP or domain address</div>
-            <button class="gw-btn gw-btn-primary" id="gwConnectBtn">
-              <span id="gwConnectBtnText">Connect</span>
-            </button>
-          </div>
-        </div>
 
         <!-- ═══ STEP 2: SERVICE SELECTOR ═══ -->
-        <div class="gateway-step" id="gwStep2">
+        <div class="gateway-step active" id="gwStep2">
           <div class="gw-steps-indicator">
-            <div class="gw-step-dot completed"></div>
-            <div class="gw-step-line completed"></div>
             <div class="gw-step-dot active"></div>
             <div class="gw-step-line"></div>
             <div class="gw-step-dot"></div>
@@ -119,16 +84,11 @@
               </div>
             </div>
           </div>
-          <button class="gw-btn-back" id="gwBackToConnect">
-            ← Change Server
-          </button>
         </div>
 
         <!-- ═══ STEP 3: AUTH VIEW ═══ -->
         <div class="gateway-step" id="gwStep3">
           <div class="gw-steps-indicator">
-            <div class="gw-step-dot completed"></div>
-            <div class="gw-step-line completed"></div>
             <div class="gw-step-dot completed"></div>
             <div class="gw-step-line completed"></div>
             <div class="gw-step-dot active"></div>
@@ -287,101 +247,7 @@
     }, 400);
   }
 
-  // ── Server Connection ────────────────────────────────────────────────
-  function handleConnect() {
-    const input = document.getElementById('gwServerInput');
-    const url = input.value.trim();
 
-    if (!url) {
-      input.classList.add('error');
-      showToast('Please enter your SphereX server address', 'warning');
-      setTimeout(() => input.classList.remove('error'), 2000);
-      return;
-    }
-
-    // Normalize URL — always use HTTPS for SphereX servers
-    let normalizedUrl = url;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      normalizedUrl = `https://${url}`;
-    }
-    normalizedUrl = normalizedUrl.replace(/\/+$/, '');
-    state.serverUrl = normalizedUrl;
-
-    // Show connecting state
-    const statusEl = document.getElementById('gwConnStatus');
-    statusEl.style.display = 'flex';
-    statusEl.className = 'gw-status connecting';
-    statusEl.innerHTML = '<span class="gw-status-dot"></span> Verifying server...';
-
-    const btn = document.getElementById('gwConnectBtn');
-    const btnText = document.getElementById('gwConnectBtnText');
-    btn.disabled = true;
-    btnText.innerHTML = '<span class="gw-spinner"></span>';
-    state.isConnecting = true;
-
-    // Health check: GET /api/ai/health (goes through Nginx → AI server)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    fetch(`${normalizedUrl}/api/ai/health`, {
-      method: 'GET',
-      signal: controller.signal,
-    })
-      .then(res => {
-        clearTimeout(timeoutId);
-        if (!res.ok) throw new Error('Server returned an error');
-        return res.json().catch(() => ({}));
-      })
-      .then(() => {
-        onConnectionSuccess(url, 'connected');
-      })
-      .catch(err => {
-        clearTimeout(timeoutId);
-        state.isConnecting = false;
-        btn.disabled = false;
-        btnText.textContent = 'Connect';
-
-        if (err.name === 'AbortError') {
-          statusEl.className = 'gw-status error';
-          statusEl.innerHTML = '<span class="gw-status-dot"></span> Connection timed out';
-          showToast('Server did not respond. Check the address and ensure it is running.', 'error');
-        } else {
-          // "Failed to fetch" can mean CORS blocked OR truly unreachable.
-          statusEl.className = 'gw-status error';
-          statusEl.innerHTML = '<span class="gw-status-dot"></span> Could not reach server';
-          showToast(
-            'Cannot connect. Check the address and ensure the server is running.',
-            'warning',
-            6000
-          );
-        }
-      });
-  }
-
-  function onConnectionSuccess(displayUrl, statusMsg) {
-    state.isConnecting = false;
-    const btn = document.getElementById('gwConnectBtn');
-    const btnText = document.getElementById('gwConnectBtnText');
-    const statusEl = document.getElementById('gwConnStatus');
-
-    btn.disabled = false;
-    statusEl.className = 'gw-status connected';
-    statusEl.innerHTML = `<span class="gw-status-dot"></span> Connected successfully`;
-    btnText.textContent = 'Connect';
-
-    document.getElementById('gwConnectedUrl').textContent = displayUrl;
-
-    try {
-      localStorage.setItem('spherex_server', state.serverUrl);
-    } catch(e) { /* ok */ }
-
-    showToast(`Connected to ${displayUrl}`, 'success');
-
-    setTimeout(() => {
-      statusEl.style.display = 'none';
-      goToStep(2);
-    }, 600);
-  }
 
   // ── Auth Handling ────────────────────────────────────────────────────
   // Correct Nginx path: POST /api/ai/users/login
@@ -627,17 +493,15 @@
     overlay.classList.add('active');
     document.body.style.overflow = 'hidden';
 
-    // Reset to step 1 if no server connected
+    // Auto-set server to same origin (Cloudflare Tunnel serves everything)
     if (!state.serverUrl) {
-      goToStep(1);
+      state.serverUrl = window.location.origin;
+      try { localStorage.setItem('spherex_server', state.serverUrl); } catch(e) { /* ok */ }
     }
+    document.getElementById('gwConnectedUrl').textContent = window.location.hostname;
 
-    // Focus first input
-    setTimeout(() => {
-      const step = document.querySelector('.gateway-step.active');
-      const input = step?.querySelector('input');
-      if (input) input.focus();
-    }, 400);
+    // Always start at service select
+    goToStep(2);
   }
 
   function closeGateway() {
@@ -659,11 +523,7 @@
       if (e.key === 'Escape') closeGateway();
     });
 
-    // Step 1: Connect
-    document.getElementById('gwConnectBtn').addEventListener('click', handleConnect);
-    document.getElementById('gwServerInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') handleConnect();
-    });
+    // Step 1 (connect) removed — no longer needed
 
     // Step 2: Service Selection
     document.getElementById('gwServiceAI').addEventListener('click', () => {
@@ -688,8 +548,7 @@
       }
     });
 
-    // Back buttons
-    document.getElementById('gwBackToConnect').addEventListener('click', () => goToStep(1));
+    // Back button (service → close since step 1 is gone)
     document.getElementById('gwBackToServices').addEventListener('click', () => goToStep(2));
 
     // Auth tabs
@@ -727,9 +586,8 @@
       } catch(e) { /* ok */ }
       state.serverUrl = '';
       state.selectedService = null;
-      document.getElementById('gwServerInput').value = '';
       showToast('Signed out', 'info');
-      goToStep(1);
+      goToStep(2);
     });
 
     // Trigger buttons
@@ -740,13 +598,7 @@
       });
     });
 
-    // Restore last used server
-    try {
-      const savedServer = localStorage.getItem('spherex_server');
-      if (savedServer) {
-        document.getElementById('gwServerInput').value = savedServer.replace(/^https?:\/\//, '');
-      }
-    } catch(e) { /* ok */ }
+    // No server input to restore — auto-detected from origin
   }
 
   // ── Initialize ───────────────────────────────────────────────────────

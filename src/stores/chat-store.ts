@@ -127,6 +127,27 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const abortController = new AbortController();
     set({ abortController });
 
+    // Upload attachments before streaming
+    let uploadedImageUrls: string[] = [];
+    if (options?.attachments && options.attachments.length > 0) {
+      set({ currentActivity: "Uploading files..." });
+      for (const file of options.attachments) {
+        try {
+          const result = await apiClient.uploadFile(file);
+          // If it's an image, the server may return a URL or file_id we can pass
+          if (file.type.startsWith("image/") && result.file_id) {
+            uploadedImageUrls.push(result.file_id);
+          }
+        } catch {
+          // Continue even if one upload fails
+        }
+      }
+      set({ currentActivity: null });
+    }
+
+    // Merge uploaded image IDs with any explicitly passed image URLs
+    const allImages = [...(options?.images || []), ...uploadedImageUrls];
+
     let accumulatedContent = "";
     const accumulatedSteps: string[] = [];
     let accumulatedImageUrls: string[] = [];
@@ -138,9 +159,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const stream = apiClient.streamMessage(message, sessionId || undefined, {
         agent: options?.agent,
         model: options?.model,
-        images: options?.images,
+        images: allImages.length > 0 ? allImages : undefined,
         isTemporary: isTemporaryMode,
         description: description || undefined,
+        signal: abortController.signal,
       });
 
       for await (const event of stream) {

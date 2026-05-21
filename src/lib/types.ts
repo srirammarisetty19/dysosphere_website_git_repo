@@ -185,7 +185,10 @@ export interface CalendarEvent {
   title: string;
   description?: string;
   start: string;
-  end: string;
-  type: "heartbeat" | "reminder" | "event";
-  color?: string;
+  end: string | null;
+  category: string;
+  all_day: boolean;
+  recurring: boolean;
+  location: string;
+  source: string;
 }

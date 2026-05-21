@@ -73,25 +73,32 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
 
   // ── Server Connectivity Monitor (Google Drive / Slack pattern) ───────
   // Background health check every 15s. Shows persistent ribbon when offline.
+  // Dispatches event for sidebar status indicator.
   const checkHealth = useCallback(async () => {
     try {
       const online = await apiClient.healthCheck();
       setIsServerOnline(online);
+      // Notify sidebar status indicator
+      window.dispatchEvent(new CustomEvent("server-health-update", { detail: { online } }));
     } catch {
       setIsServerOnline(false);
+      window.dispatchEvent(new CustomEvent("server-health-update", { detail: { online: false } }));
     }
   }, []);
 
   useEffect(() => {
-    // Initial check after 2s (give time for auth hydration)
-    const initialTimer = setTimeout(checkHealth, 2000);
+    // Wait for auth hydration before running health checks to prevent false offline flash
+    if (!_hasHydrated || !user) return;
+
+    // Initial check after 500ms (give time for API client to be configured)
+    const initialTimer = setTimeout(checkHealth, 500);
     // Periodic check every 15 seconds
     const interval = setInterval(checkHealth, 15000);
     return () => {
       clearTimeout(initialTimer);
       clearInterval(interval);
     };
-  }, [checkHealth]);
+  }, [checkHealth, _hasHydrated, user]);
 
   const handleRetry = async () => {
     setIsCheckingHealth(true);

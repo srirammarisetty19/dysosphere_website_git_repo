@@ -57,8 +57,17 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
+  // Scroll during streaming (every token update) and on completion
+  const prevLoadingRef = useRef(false);
   useEffect(() => {
+    const wasLoading = prevLoadingRef.current;
+    prevLoadingRef.current = isLoading;
+
     if (isLoading) {
+      // During streaming — scroll on each message update
+      scrollToBottom();
+    } else if (wasLoading && !isLoading) {
+      // Streaming just finished — scroll to final position
       scrollToBottom();
     }
   }, [messages, isLoading, scrollToBottom]);

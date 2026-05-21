@@ -159,13 +159,30 @@ export function ChatInput({ onSend, isLoading, onStop }: ChatInputProps) {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         const file = new File([blob], `recording_${Date.now()}.webm`, {
           type: "audio/webm",
         });
-        setAttachments((prev) => [...prev, file]);
         stream.getTracks().forEach((t) => t.stop());
+
+        // Try server-side STT transcription
+        try {
+          const { apiClient } = await import("@/lib/api-client");
+          const result = await apiClient.uploadFile(file);
+          if (result.extracted_text && result.extracted_text.trim()) {
+            // Populate textarea with transcribed text
+            setMessage((prev) =>
+              prev ? `${prev} ${result.extracted_text!.trim()}` : result.extracted_text!.trim()
+            );
+          } else {
+            // No transcription returned — add as attachment
+            setAttachments((prev) => [...prev, file]);
+          }
+        } catch {
+          // STT failed — fall back to adding as attachment
+          setAttachments((prev) => [...prev, file]);
+        }
       };
 
       mediaRecorder.start();

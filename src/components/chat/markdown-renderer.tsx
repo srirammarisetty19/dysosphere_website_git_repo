@@ -235,13 +235,34 @@ function CodeBlock({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
     return extractText(children);
   };
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(getCodeText());
+  const handleCopy = () => {
+    const text = getCodeText();
+    let ok = false;
+    // Try modern Clipboard API first (requires secure context)
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
+      ok = true;
+    } else {
+      // Fallback: hidden textarea + execCommand
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "-9999px";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        ok = false;
+      }
+    }
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard API not available
     }
   };
 
