@@ -34,7 +34,25 @@ import {
   Move,
   X,
   Check,
+  Palette,
 } from "lucide-react";
+
+// Folder color palette — matches Flutter app's ColorPickerDialog
+const FOLDER_COLORS = [
+  "#757575", // grey 600
+  "#795548", // brown
+  "#F06292", // pink 300
+  "#F44336", // red
+  "#FF9800", // orange
+  "#FDD835", // yellow 600
+  "#8BC34A", // light green
+  "#009688", // teal
+  "#00BCD4", // cyan
+  "#03A9F4", // light blue
+  "#2196F3", // blue
+  "#3F51B5", // indigo
+  "#9C27B0", // purple
+];
 
 const FILTER_OPTIONS: { value: FileTypeFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -84,6 +102,7 @@ export default function NasHomePage() {
   const [detailsItem, setDetailsItem] = useState<DisplayItem | null>(null);
   const [renameItem, setRenameItem] = useState<DisplayItem | null>(null);
   const [renameName, setRenameName] = useState("");
+  const [colorPickerItem, setColorPickerItem] = useState<DisplayItem | null>(null);
 
   // Load initial directory
   useEffect(() => {
@@ -215,6 +234,19 @@ export default function NasHomePage() {
       loadDirectory(currentDirectoryId);
     } catch {
       alert("Rename failed");
+    }
+  };
+
+  const handleChangeColor = async (color: string) => {
+    if (!colorPickerItem || colorPickerItem.kind !== "directory") return;
+    try {
+      await nasApiClient.updateDirectoryPrefs(colorPickerItem.item.id, {
+        color,
+      });
+      setColorPickerItem(null);
+      loadDirectory(currentDirectoryId);
+    } catch {
+      alert("Failed to update color");
     }
   };
 
@@ -543,8 +575,8 @@ export default function NasHomePage() {
           onChangeColor={
             contextMenu.item.kind === "directory"
               ? () => {
-                  // TODO: Color picker
-                  alert("Color picker coming soon");
+                  setColorPickerItem(contextMenu.item);
+                  setContextMenu(null);
                 }
               : undefined
           }
@@ -618,6 +650,47 @@ export default function NasHomePage() {
                 className="px-4 py-2 rounded-lg text-sm bg-accent-blue text-white hover:bg-accent-blue/90"
               >
                 Rename
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Color Picker Dialog */}
+      {colorPickerItem && colorPickerItem.kind === "directory" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-80 rounded-2xl border border-border-subtle bg-bg-secondary p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-text-primary mb-1">
+              Select Color
+            </h3>
+            <p className="text-xs text-text-tertiary mb-5">
+              {colorPickerItem.item.name}
+            </p>
+            <div className="grid grid-cols-5 gap-3 justify-items-center">
+              {FOLDER_COLORS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => handleChangeColor(color)}
+                  className="h-10 w-10 rounded-full border-2 border-transparent hover:border-white/40 hover:scale-110 transition-all duration-150"
+                  style={{ backgroundColor: color }}
+                  title={color}
+                />
+              ))}
+            </div>
+            {/* Reset to default */}
+            <button
+              onClick={() => handleChangeColor("#FFFFFF")}
+              className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs text-text-secondary hover:bg-white/5 border border-border-subtle"
+            >
+              <Palette className="h-3.5 w-3.5" />
+              Reset to default
+            </button>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setColorPickerItem(null)}
+                className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:bg-white/5"
+              >
+                Cancel
               </button>
             </div>
           </div>

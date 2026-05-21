@@ -17,12 +17,12 @@
   },
   {
     "route": "/nas",
-    "firstLoadUncompressedJsBytes": 601547,
+    "firstLoadUncompressedJsBytes": 603099,
     "firstLoadChunkPaths": [
       ".next/static/chunks/01xlw8hd842-c.js",
       ".next/static/chunks/0t2xr05rlu96l.js",
       ".next/static/chunks/10sj4i4m_j6ot.js",
-      ".next/static/chunks/0343w0aq8ny2~.js",
+      ".next/static/chunks/0z.vudh521u5p.js",
       ".next/static/chunks/137uw2-qbro07.js",
       ".next/static/chunks/0pqt~8bl3ukh4.js",
       ".next/static/chunks/00xhsd~k-wxkl.js",
