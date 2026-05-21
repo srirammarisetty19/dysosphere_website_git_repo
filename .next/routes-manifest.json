@@ -55,6 +55,14 @@
         "nxtPproxy": "nxtPproxy"
       },
       "namedRegex": "^/api/(?<nxtPproxy>.+?)(?:/)?$"
+    },
+    {
+      "page": "/nas/people/[clusterId]",
+      "regex": "^/nas/people/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPclusterId": "nxtPclusterId"
+      },
+      "namedRegex": "^/nas/people/(?<nxtPclusterId>[^/]+?)(?:/)?$"
     }
   ],
   "staticRoutes": [
@@ -105,6 +113,54 @@
       "regex": "^/login(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/nas",
+      "regex": "^/nas(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nas(?:/)?$"
+    },
+    {
+      "page": "/nas/notifications",
+      "regex": "^/nas/notifications(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nas/notifications(?:/)?$"
+    },
+    {
+      "page": "/nas/people",
+      "regex": "^/nas/people(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nas/people(?:/)?$"
+    },
+    {
+      "page": "/nas/search",
+      "regex": "^/nas/search(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nas/search(?:/)?$"
+    },
+    {
+      "page": "/nas/settings",
+      "regex": "^/nas/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nas/settings(?:/)?$"
+    },
+    {
+      "page": "/nas/shared",
+      "regex": "^/nas/shared(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nas/shared(?:/)?$"
+    },
+    {
+      "page": "/nas/starred",
+      "regex": "^/nas/starred(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nas/starred(?:/)?$"
+    },
+    {
+      "page": "/nas/trash",
+      "regex": "^/nas/trash(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nas/trash(?:/)?$"
     },
     {
       "page": "/register",

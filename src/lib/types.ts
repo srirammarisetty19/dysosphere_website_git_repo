@@ -172,10 +172,16 @@ export interface GpuStatus {
 // ── Upload ──────────────────────────────────────────────────────────────
 
 export interface UploadResult {
+  id: string;
   filename: string;
-  file_id: string;
-  content_type: string;
+  media_type: string;
+  stored_path?: string;
+  text_preview?: string;
   extracted_text?: string;
+  file_size_bytes?: number;
+  metadata?: Record<string, unknown>;
+  image_urls?: string[];
+  image_id?: string;
 }
 
 // ── Calendar ────────────────────────────────────────────────────────────

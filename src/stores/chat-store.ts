@@ -128,15 +128,29 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     set({ abortController });
 
     // Upload attachments before streaming
-    let uploadedImageUrls: string[] = [];
+    let imageContext = "";
+    let documentContext = "";
     if (options?.attachments && options.attachments.length > 0) {
       set({ currentActivity: "Uploading files..." });
       for (const file of options.attachments) {
         try {
           const result = await apiClient.uploadFile(file);
-          // If it's an image, the server may return a URL or file_id we can pass
-          if (file.type.startsWith("image/") && result.file_id) {
-            uploadedImageUrls.push(result.file_id);
+
+          if (result.media_type === "image" && (result.image_id || result.id)) {
+            // Image: tell the agent to use analyze_image tool (matches server pattern)
+            const imgId = result.image_id || result.id;
+            imageContext += (
+              `[UPLOADED IMAGE: "${result.filename}" | image_id: ${imgId}]\n` +
+              `Use the analyze_image tool with image_id="${imgId}" to examine this image.\n\n`
+            );
+          } else if (result.extracted_text) {
+            // Document/audio/text: prepend extracted content as context
+            documentContext += (
+              `[UPLOADED FILE: ${result.filename} (${result.media_type})]\n` +
+              `--- File Content ---\n` +
+              `${result.extracted_text.slice(0, 6000)}\n` +
+              `--- End File Content ---\n\n`
+            );
           }
         } catch {
           // Continue even if one upload fails
@@ -145,8 +159,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       set({ currentActivity: null });
     }
 
-    // Merge uploaded image IDs with any explicitly passed image URLs
-    const allImages = [...(options?.images || []), ...uploadedImageUrls];
+    // Build the final message: prepend file context if any
+    const fileContext = imageContext + documentContext;
+    const finalMessage = fileContext ? fileContext + message : message;
 
     let accumulatedContent = "";
     const accumulatedSteps: string[] = [];
@@ -156,10 +171,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     let title = get().currentTitle;
 
     try {
-      const stream = apiClient.streamMessage(message, sessionId || undefined, {
+      const stream = apiClient.streamMessage(finalMessage, sessionId || undefined, {
         agent: options?.agent,
         model: options?.model,
-        images: allImages.length > 0 ? allImages : undefined,
+        images: options?.images,
         isTemporary: isTemporaryMode,
         description: description || undefined,
         signal: abortController.signal,

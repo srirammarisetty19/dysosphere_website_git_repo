@@ -75,12 +75,12 @@
                 <div class="gw-badge-active">● Active</div>
               </div>
             </div>
-            <div class="gw-service-card disabled" id="gwServiceNAS" tabindex="0" role="button" aria-label="SphereX NAS — Coming Soon">
+            <div class="gw-service-card" id="gwServiceNAS" tabindex="0" role="button" aria-label="Access SphereX NAS">
               <div class="gw-service-icon">💾</div>
               <div>
                 <h3>SphereX NAS</h3>
                 <p>AI-powered intelligent storage</p>
-                <div class="gw-badge-soon">🚧 Coming Soon</div>
+                <div class="gw-badge-active">● Active</div>
               </div>
             </div>
           </div>
@@ -94,7 +94,7 @@
             <div class="gw-step-dot active"></div>
           </div>
           <div class="gateway-brand">
-            <div class="gateway-logo">🧠</div>
+            <div class="gateway-logo" id="gwAuthLogo">🧠</div>
             <h2 id="gwAuthTitle">Sign in to SphereX AI</h2>
             <p id="gwAuthSubtitle">Access your private AI assistant</p>
           </div>
@@ -176,7 +176,7 @@
               </div>
               <div class="gw-session-row">
                 <span class="gw-session-label">Service</span>
-                <span class="gw-session-value">SphereX AI</span>
+                <span class="gw-session-value" id="gwSessionService">SphereX AI</span>
               </div>
               <div class="gw-session-row">
                 <span class="gw-session-label">Status</span>
@@ -424,7 +424,7 @@
       };
       localStorage.setItem('sphere-auth', JSON.stringify(accountData));
       localStorage.setItem('spherex_server', serverBase);
-      localStorage.setItem('spherex_service', 'ai');
+      localStorage.setItem('spherex_service', state.selectedService || 'ai');
     } catch(e) { /* localStorage may not be available */ }
   }
 
@@ -438,10 +438,9 @@
       email: state.authEmail || '',
       uid: state.authUserId || '',
     });
-    // Redirect to the web app on the same origin (Cloudflare Tunnel serves both)
-    // If running on localhost during dev, use relative path.
-    const chatPath = `/chat?${params.toString()}`;
-    window.location.href = chatPath;
+    // Route to the correct web app based on selected service
+    const appPath = state.selectedService === 'nas' ? '/nas' : '/chat';
+    window.location.href = `${appPath}?${params.toString()}`;
   }
 
   // ── Toggle Auth Tabs ─────────────────────────────────────────────────
@@ -457,20 +456,24 @@
 
     errEl.style.display = 'none';
 
+    const isNas = state.selectedService === 'nas';
+    const serviceName = isNas ? 'SphereX NAS' : 'SphereX AI';
+    const serviceDesc = isNas ? 'Access your intelligent storage' : 'Access your private AI assistant';
+
     if (mode === 'login') {
       loginTab.classList.add('active');
       regTab.classList.remove('active');
       loginForm.style.display = 'flex';
       regForm.style.display = 'none';
-      title.textContent = 'Sign in to SphereX AI';
-      subtitle.textContent = 'Access your private AI assistant';
+      title.textContent = `Sign in to ${serviceName}`;
+      subtitle.textContent = serviceDesc;
     } else {
       loginTab.classList.remove('active');
       regTab.classList.add('active');
       loginForm.style.display = 'none';
       regForm.style.display = 'flex';
       title.textContent = 'Create your Account';
-      subtitle.textContent = 'Join SphereX AI on your server';
+      subtitle.textContent = `Join ${serviceName} on your server`;
     }
   }
 
@@ -526,26 +529,32 @@
     // Step 1 (connect) removed — no longer needed
 
     // Step 2: Service Selection
-    document.getElementById('gwServiceAI').addEventListener('click', () => {
-      state.selectedService = 'ai';
-      goToStep(3);
-    });
-    document.getElementById('gwServiceAI').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        state.selectedService = 'ai';
-        goToStep(3);
+    function selectService(service) {
+      state.selectedService = service;
+      // Update auth step UI to match selected service
+      const logo = document.getElementById('gwAuthLogo');
+      const title = document.getElementById('gwAuthTitle');
+      const subtitle = document.getElementById('gwAuthSubtitle');
+      if (service === 'nas') {
+        logo.textContent = '💾';
+        title.textContent = 'Sign in to SphereX NAS';
+        subtitle.textContent = 'Access your intelligent storage';
+      } else {
+        logo.textContent = '🧠';
+        title.textContent = 'Sign in to SphereX AI';
+        subtitle.textContent = 'Access your private AI assistant';
       }
+      goToStep(3);
+    }
+
+    document.getElementById('gwServiceAI').addEventListener('click', () => selectService('ai'));
+    document.getElementById('gwServiceAI').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectService('ai'); }
     });
 
-    document.getElementById('gwServiceNAS').addEventListener('click', () => {
-      showToast('SphereX NAS is currently in development. Stay tuned!', 'info', 4000);
-    });
+    document.getElementById('gwServiceNAS').addEventListener('click', () => selectService('nas'));
     document.getElementById('gwServiceNAS').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        showToast('SphereX NAS is currently in development. Stay tuned!', 'info', 4000);
-      }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectService('nas'); }
     });
 
     // Back button (service → close since step 1 is gone)

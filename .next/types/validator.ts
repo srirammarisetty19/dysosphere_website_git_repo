@@ -110,6 +110,87 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../src/app/(nas)/nas/notifications/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/nas/notifications">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/nas/notifications/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(nas)/nas/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/nas">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/nas/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(nas)/nas/people/[clusterId]/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/nas/people/[clusterId]">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/nas/people/[clusterId]/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(nas)/nas/people/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/nas/people">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/nas/people/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(nas)/nas/search/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/nas/search">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/nas/search/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(nas)/nas/settings/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/nas/settings">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/nas/settings/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(nas)/nas/shared/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/nas/shared">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/nas/shared/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(nas)/nas/starred/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/nas/starred">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/nas/starred/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(nas)/nas/trash/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/nas/trash">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/nas/trash/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../src/app/api/[...proxy]/route.ts
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/[...proxy]">> = Specific
@@ -136,6 +217,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends LayoutConfig<"/">> = Specific
   const handler = {} as typeof import("../../src/app/(app)/layout.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(nas)/layout.tsx
+{
+  type __IsExpected<Specific extends LayoutConfig<"/">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/layout.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check

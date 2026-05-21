@@ -1,0 +1,17 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(nas)/layout,_N_T_/(nas)/nas/layout,_N_T_/(nas)/nas/starred/layout,_N_T_/(nas)/nas/starred/page,_N_T_/nas/starred"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KG5hcyk/nas/starred/__PAGE__",
+    "/!KG5hcyk/nas/starred",
+    "/!KG5hcyk/nas",
+    "/!KG5hcyk",
+    "/_index",
+    "/_head"
+  ]
+}
