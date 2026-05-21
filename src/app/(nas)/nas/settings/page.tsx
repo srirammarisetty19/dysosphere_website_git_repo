@@ -35,11 +35,25 @@ export default function NasSettingsPage() {
 
   async function handleThemeChange(newTheme: ThemeMode) {
     setTheme(newTheme);
+    applyTheme(newTheme);
     try {
+      localStorage.setItem("nas-theme", newTheme);
       await nasApiClient.updateProfile({ theme: newTheme });
     } catch {
       // ignore
     }
+  }
+
+  function applyTheme(mode: ThemeMode) {
+    let resolved: "dark" | "light" = "dark";
+    if (mode === "light") {
+      resolved = "light";
+    } else if (mode === "system") {
+      resolved = window.matchMedia("(prefers-color-scheme: light)").matches
+        ? "light"
+        : "dark";
+    }
+    document.documentElement.setAttribute("data-theme", resolved);
   }
 
   async function handleNotifyShareChange(val: boolean) {
@@ -143,7 +157,7 @@ export default function NasSettingsPage() {
           </h2>
           <div className="rounded-2xl border border-border-subtle bg-bg-tertiary overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4">
-              <div>
+              <div className="flex-1 min-w-0 mr-4">
                 <p className="text-sm text-text-primary">Shared with me</p>
                 <p className="text-xs text-text-tertiary mt-0.5">
                   Get notified when someone shares a file with you
@@ -152,15 +166,12 @@ export default function NasSettingsPage() {
               <button
                 onClick={() => handleNotifyShareChange(!notifyShare)}
                 className={`
-                  relative h-6 w-11 rounded-full transition-colors
+                  relative shrink-0 h-6 w-11 rounded-full transition-colors duration-200
                   ${notifyShare ? "bg-accent-blue" : "bg-white/10"}
                 `}
               >
                 <div
-                  className={`
-                    absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform
-                    ${notifyShare ? "translate-x-5.5 left-0.5" : "left-0.5"}
-                  `}
+                  className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200"
                   style={{
                     transform: notifyShare
                       ? "translateX(20px)"
@@ -171,7 +182,7 @@ export default function NasSettingsPage() {
             </div>
             <div className="border-t border-border-subtle" />
             <div className="flex items-center justify-between px-5 py-4">
-              <div>
+              <div className="flex-1 min-w-0 mr-4">
                 <p className="text-sm text-text-primary">Storage alerts</p>
                 <p className="text-xs text-text-tertiary mt-0.5">
                   Get notified when storage space is low
@@ -180,17 +191,16 @@ export default function NasSettingsPage() {
               <button
                 onClick={() => handleNotifyStorageChange(!notifyStorage)}
                 className={`
-                  relative h-6 w-11 rounded-full transition-colors
+                  relative shrink-0 h-6 w-11 rounded-full transition-colors duration-200
                   ${notifyStorage ? "bg-accent-blue" : "bg-white/10"}
                 `}
               >
                 <div
-                  className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
+                  className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200"
                   style={{
                     transform: notifyStorage
                       ? "translateX(20px)"
                       : "translateX(0)",
-                    left: "2px",
                   }}
                 />
               </button>

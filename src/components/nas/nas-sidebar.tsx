@@ -25,6 +25,7 @@ import {
   X,
   ChevronRight,
 } from "lucide-react";
+import Image from "next/image";
 
 interface NasSidebarProps {
   isOpen: boolean;
@@ -45,11 +46,12 @@ export function NasSidebar({ isOpen, onClose }: NasSidebarProps) {
   const loadStats = useCallback(async () => {
     try {
       const stats = await nasApiClient.getStorageStats();
-      setStorageUsed(stats.used);
-      setStorageLimit(stats.limit);
+      console.log('[NAS Sidebar] Storage stats:', stats);
+      setStorageUsed(stats.used || 0);
+      setStorageLimit(stats.limit || 1);
       setStorageBreakdown(stats.breakdown || []);
-    } catch {
-      // Non-critical
+    } catch (err) {
+      console.warn('[NAS Sidebar] Failed to load storage stats:', err);
     }
   }, []);
 
@@ -112,7 +114,8 @@ export function NasSidebar({ isOpen, onClose }: NasSidebarProps) {
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-5 border-b border-border-subtle">
-          <HardDrive className="h-6 w-6 text-accent-blue" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/DS.svg" alt="DS" className="h-7 w-auto" />
           <span className="text-lg font-semibold tracking-tight text-text-primary">
             SphereX NAS
           </span>

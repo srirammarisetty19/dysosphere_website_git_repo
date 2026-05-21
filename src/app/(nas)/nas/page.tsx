@@ -373,7 +373,12 @@ export default function NasHomePage() {
               <ChevronDown className="h-3 w-3" />
             </button>
             {showSortMenu && (
-              <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-xl border border-border-subtle bg-bg-secondary shadow-xl py-1">
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowSortMenu(false)}
+                />
+                <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl border border-border-subtle bg-bg-secondary shadow-xl py-1">
                 {(["name", "date", "size", "type"] as const).map((sb) => (
                   <button
                     key={sb}
@@ -403,6 +408,7 @@ export default function NasHomePage() {
                   </button>
                 ))}
               </div>
+              </>
             )}
           </div>
         </div>

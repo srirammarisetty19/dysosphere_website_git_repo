@@ -215,8 +215,17 @@ class NasApiClient {
     onProgress?: (loaded: number, total: number) => void,
     signal?: AbortSignal
   ): Promise<unknown> {
+    // directory_id is required by the server (Form(...))
+    // If null (root), we must resolve it first
+    let resolvedDirId = directoryId;
+    if (!resolvedDirId) {
+      // Fetch root directory ID
+      const listing = await this.listFiles(null, 1, 0);
+      resolvedDirId = listing.directory.id;
+    }
+
     const formData = new FormData();
-    if (directoryId) formData.append("directory_id", directoryId);
+    formData.append("directory_id", resolvedDirId);
     formData.append("files", file);
 
     // Use XMLHttpRequest for progress tracking (fetch doesn't support upload progress)

@@ -90,6 +90,20 @@ function NasLayoutInner({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [checkHealth]);
 
+  // ── Theme Hydration ─────────────────────────────────────────────────
+  useEffect(() => {
+    const saved = localStorage.getItem("nas-theme") || "dark";
+    let resolved: "dark" | "light" = "dark";
+    if (saved === "light") {
+      resolved = "light";
+    } else if (saved === "system") {
+      resolved = window.matchMedia("(prefers-color-scheme: light)").matches
+        ? "light"
+        : "dark";
+    }
+    document.documentElement.setAttribute("data-theme", resolved);
+  }, []);
+
   // ── Loading state ───────────────────────────────────────────────────
   if (!_hasHydrated) {
     return (
