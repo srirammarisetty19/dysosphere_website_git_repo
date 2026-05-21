@@ -1,11 +1,11 @@
 "use client";
 
 // ============================================================================
-// File Thumbnail — Google Drive style thumbnail with proxy-based auth
-// Uses BFF proxy for authenticated image loading (industry standard)
+// File Thumbnail — Google Drive style thumbnail with authenticated fetch
+// Fetches thumbnails as blobs with Authorization header (img tags can't send JWT)
 // ============================================================================
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { nasApiClient } from "@/lib/nas-api-client";
 import {
   File,
@@ -26,17 +26,6 @@ interface FileThumbnailProps {
   className?: string;
   size?: "sm" | "md" | "lg";
 }
-
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  file: File,
-  "file-text": FileText,
-  image: Image,
-  film: Film,
-  music: Music,
-  table: Table,
-  "file-code": FileCode,
-  archive: Archive,
-};
 
 function getIconAndColor(
   mimeType: string | null
@@ -73,6 +62,7 @@ export function FileThumbnail({
   className = "",
   size = "md",
 }: FileThumbnailProps) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
   const isImage = mimeType?.startsWith("image/");
   const isVideo = mimeType?.startsWith("video/");
@@ -86,26 +76,53 @@ export function FileThumbnail({
     lg: "h-full w-full",
   };
 
-  if (hasThumbnail) {
-    const token = nasApiClient.getToken();
-    const thumbUrl = nasApiClient.thumbnailUrl(fileId);
+  // Fetch thumbnail as blob with auth header
+  // (img src= can't send Authorization: Bearer headers)
+  useEffect(() => {
+    if (!hasThumbnail) return;
 
+    let cancelled = false;
+    const url = nasApiClient.thumbnailUrl(fileId);
+    const token = nasApiClient.getToken();
+
+    fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (!cancelled) {
+          setBlobUrl(URL.createObjectURL(blob));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setImgError(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fileId, hasThumbnail]);
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [blobUrl]);
+
+  if (hasThumbnail && blobUrl) {
     return (
       <div
         className={`relative overflow-hidden bg-white/5 ${sizeClasses[size]} ${className}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={thumbUrl}
+          src={blobUrl}
           alt={name}
-          loading="lazy"
           className="h-full w-full object-cover"
-          onError={() => setImgError(true)}
-          // For cross-origin requests, auth header is sent via fetch interceptor
-          // For same-origin (BFF proxy), cookie/header is auto-forwarded
-          {...(token
-            ? { crossOrigin: "use-credentials" }
-            : {})}
         />
         {/* Video play badge */}
         {isVideo && (
@@ -115,6 +132,17 @@ export function FileThumbnail({
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // Loading state for thumbnails
+  if (hasThumbnail && !blobUrl && !imgError) {
+    return (
+      <div
+        className={`flex items-center justify-center bg-white/5 animate-pulse ${sizeClasses[size]} ${className}`}
+      >
+        <Icon className={`${size === "sm" ? "h-5 w-5" : "h-10 w-10"} opacity-30`} style={{ color }} />
       </div>
     );
   }

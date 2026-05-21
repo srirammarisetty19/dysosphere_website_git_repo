@@ -52,9 +52,12 @@ export function FileViewerModal({ item, onClose }: FileViewerModalProps) {
       setIsLoading(true);
       try {
         if (isImage) {
-          // Use thumbnail URL for images (proxy handles auth)
-          const url = nasApiClient.thumbnailUrl(file.id);
-          setBlobUrl(url);
+          // Fetch the full image via download endpoint with auth header
+          // (img src= can't carry Bearer tokens)
+          const blob = await nasApiClient.downloadFile(file.id);
+          if (!cancelled) {
+            setBlobUrl(URL.createObjectURL(blob));
+          }
         } else if (isVideo || isAudio || isPdf) {
           const blob = await nasApiClient.downloadFile(file.id);
           if (!cancelled) {
@@ -67,8 +70,8 @@ export function FileViewerModal({ item, onClose }: FileViewerModalProps) {
             setTextContent(text);
           }
         }
-      } catch {
-        // Failed to load
+      } catch (err) {
+        console.error("[FileViewer] Failed to load file:", err);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -77,7 +80,6 @@ export function FileViewerModal({ item, onClose }: FileViewerModalProps) {
     load();
     return () => {
       cancelled = true;
-      if (blobUrl && !isImage) URL.revokeObjectURL(blobUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file.id]);
