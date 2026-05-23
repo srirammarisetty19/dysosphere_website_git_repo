@@ -408,6 +408,20 @@ class ApiClient {
     // Server does not support session rename — title is auto-set from first message
   }
 
+  /**
+   * Cancel an active agent run on a session (v2 — registry-based).
+   * Signals the engine to stop via cancel_event and persists partial results.
+   */
+  async cancelAgentRun(sessionId: string): Promise<void> {
+    try {
+      await this.request(`/api/sessions/${sessionId}/cancel`, {
+        method: "POST",
+      });
+    } catch {
+      // Non-critical — silent failure (run may have already completed)
+    }
+  }
+
   // ── Agents ──────────────────────────────────────────────────────────
 
   async getAgents(): Promise<AgentMetadata[]> {
@@ -467,6 +481,7 @@ class ApiClient {
       } catch {
         errorMessage = response.statusText;
       }
+      // 429 = Too Many Runs, 503 = Server Busy — both carry registry error details
       throw new ApiClientError(errorMessage, response.status);
     }
 

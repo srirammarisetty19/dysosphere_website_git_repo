@@ -6,7 +6,7 @@
 
 import { create } from "zustand";
 import type { Message, Conversation, NasFileResult } from "@/lib/types";
-import { apiClient } from "@/lib/api-client";
+import { apiClient, ApiClientError } from "@/lib/api-client";
 
 interface ChatState {
   // Current conversation
@@ -18,6 +18,7 @@ interface ChatState {
 
   // Streaming state
   isLoading: boolean;
+  isResuming: boolean;        // True when replaying buffered events from registry
   currentActivity: string | null;
   iterationSummaries: string[];
   errorMessage: string | null;
@@ -40,6 +41,7 @@ interface ChatState {
     }
   ) => Promise<void>;
   stopGeneration: () => void;
+  cancelRun: () => Promise<void>;   // Cancel via registry + abort controller
   loadConversation: (conversationId: string) => Promise<void>;
   newChat: (temporary?: boolean, description?: string) => void;
   deleteConversation: (conversationId: string) => Promise<void>;
@@ -81,6 +83,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   isTemporaryMode: false,
   description: null,
   isLoading: false,
+  isResuming: false,
   currentActivity: null,
   iterationSummaries: [],
   errorMessage: null,
@@ -170,126 +173,207 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     let sessionId = conversationId;
     let title = get().currentTitle;
 
+    const MAX_RETRIES = 5;
+    let retryCount = 0;
+    let hasReceivedData = false;
+
+    /**
+     * Check if an error is a network-level failure that warrants a retry.
+     * Returns false for HTTP errors, user abort, and API errors.
+     */
+    const isRetryableNetworkError = (err: unknown): boolean => {
+      // User abort — never retry
+      if (err instanceof Error && err.name === "AbortError") return false;
+      // HTTP error from our API client (401, 429, 503, etc.) — don't retry
+      if (err instanceof ApiClientError) return false;
+      // TypeError is what fetch throws on network failure (connection lost)
+      if (err instanceof TypeError) return true;
+      // Other network-related errors
+      if (err instanceof Error) {
+        const msg = err.message.toLowerCase();
+        return msg.includes("network") ||
+               msg.includes("fetch") ||
+               msg.includes("connection") ||
+               msg.includes("aborted");
+      }
+      return false;
+    };
+
     try {
-      const stream = apiClient.streamMessage(finalMessage, sessionId || undefined, {
-        agent: options?.agent,
-        model: options?.model,
-        images: options?.images,
-        isTemporary: isTemporaryMode,
-        description: description || undefined,
-        signal: abortController.signal,
-      });
+    while (retryCount <= MAX_RETRIES) {
+      try {
+        const stream = apiClient.streamMessage(finalMessage, sessionId || undefined, {
+          agent: options?.agent,
+          model: options?.model,
+          images: options?.images,
+          isTemporary: isTemporaryMode,
+          description: description || undefined,
+          signal: abortController.signal,
+        });
 
-      for await (const event of stream) {
-        if (abortController.signal.aborted) break;
+        for await (const event of stream) {
+          if (abortController.signal.aborted) break;
+          hasReceivedData = true;
 
-        switch (event.type) {
-          case "token":
-            accumulatedContent += event.content || "";
-            break;
+          switch (event.type) {
+            case "token":
+              accumulatedContent += event.content || "";
+              break;
 
-          case "thinking":
-            accumulatedContent += event.content || "";
-            break;
+            case "thinking":
+              accumulatedContent += event.content || "";
+              break;
 
-          case "session":
-            sessionId = event.session_id || sessionId;
-            set({ conversationId: sessionId });
-            break;
+            case "session":
+              sessionId = event.session_id || sessionId;
+              set({ conversationId: sessionId });
+              break;
 
-          case "title":
-            title = event.title || title;
-            set({ currentTitle: title });
-            break;
+            case "title":
+              title = event.title || title;
+              set({ currentTitle: title });
+              break;
 
-          case "status":
-            // Status updates (e.g., "generating", "tool_calling")
-            break;
+            case "status":
+              // Detect resume/replay status events from the run registry
+              {
+                const statusContent = event.content || "";
+                if (
+                  statusContent.includes("Resuming") ||
+                  statusContent.includes("Caught up") ||
+                  statusContent.includes("Replaying") ||
+                  statusContent.includes("Catching up")
+                ) {
+                  // Server is replaying buffered events from a previous connection
+                  // Reset accumulators so the snapshot builds cleanly
+                  accumulatedContent = "";
+                  accumulatedSteps.length = 0;
+                  accumulatedImageUrls = [];
+                  accumulatedNasFiles = [];
+                  set({ isResuming: true, currentActivity: statusContent });
+                }
+              }
+              break;
 
-          case "activity":
-            set({ currentActivity: event.content || null });
-            break;
+            case "activity":
+              set({ currentActivity: event.content || null });
+              break;
 
-          case "iteration_summary":
-            set({
-              iterationSummaries: [
-                ...get().iterationSummaries,
-                event.content || "",
-              ],
-            });
-            break;
+            case "iteration_summary":
+              set({
+                iterationSummaries: [
+                  ...get().iterationSummaries,
+                  event.content || "",
+                ],
+              });
+              break;
 
-          case "tool_call":
-            accumulatedSteps.push(
-              `🔧 ${event.tool || "Tool"}`
-            );
-            break;
+            case "tool_call":
+              accumulatedSteps.push(
+                `🔧 ${event.tool || "Tool"}`
+              );
+              break;
 
-          case "tool_result":
-            const hasError =
-              (event.content || "").includes("❌") ||
-              (event.content || "").includes("failed");
-            accumulatedSteps.push(
-              hasError ? "⚠️ Tool error" : "✅ Tool completed"
-            );
-            break;
+            case "tool_result":
+              const hasError =
+                (event.content || "").includes("❌") ||
+                (event.content || "").includes("failed");
+              accumulatedSteps.push(
+                hasError ? "⚠️ Tool error" : "✅ Tool completed"
+              );
+              break;
 
-          case "image":
-            if (event.image_urls) {
-              accumulatedImageUrls = [
-                ...accumulatedImageUrls,
-                ...event.image_urls,
-              ];
+            case "image":
+              if (event.image_urls) {
+                accumulatedImageUrls = [
+                  ...accumulatedImageUrls,
+                  ...event.image_urls,
+                ];
+              }
+              break;
+
+            case "nas_files":
+              if (event.nas_files) {
+                accumulatedNasFiles = [
+                  ...accumulatedNasFiles,
+                  ...event.nas_files,
+                ];
+              }
+              break;
+
+            case "error":
+              set({ errorMessage: event.error || "An error occurred" });
+              break;
+
+            case "done":
+              // Stream complete
+              break;
+          }
+
+          // Update the assistant message in place
+          const currentMessages = get().messages;
+          const parsed = parseStructuredContent(accumulatedContent);
+          const displayContent = get().isLoading
+            ? stripIncompleteImageMarkdown(parsed)
+            : parsed;
+
+          const updatedAssistant: Message = {
+            ...currentMessages[currentMessages.length - 1],
+            content: displayContent,
+            steps: [...accumulatedSteps],
+            image_urls: [...accumulatedImageUrls],
+            nas_files: [...accumulatedNasFiles],
+          };
+
+          set({
+            messages: [
+              ...currentMessages.slice(0, -1),
+              updatedAssistant,
+            ],
+          });
+        }
+        break; // Stream completed successfully — exit retry loop
+
+      } catch (err) {
+        // Only retry if: we received data + error is network-level + user didn't abort
+        const shouldRetry = hasReceivedData &&
+          isRetryableNetworkError(err) &&
+          !abortController.signal.aborted &&
+          retryCount < MAX_RETRIES;
+
+        if (!shouldRetry) {
+          // Non-retryable or retries exhausted — let existing error handling deal with it
+          if ((err as Error).name !== "AbortError") {
+            // Detect concurrency limit errors
+            if (err instanceof ApiClientError) {
+              if (err.status === 429) {
+                set({
+                  errorMessage: "Too many active requests. Please wait for a previous response to finish.",
+                });
+              } else if (err.status === 503) {
+                set({
+                  errorMessage: "Server is at capacity. Please try again shortly.",
+                });
+              } else {
+                set({ errorMessage: err.message });
+              }
+            } else {
+              set({
+                errorMessage:
+                  err instanceof Error ? err.message : "Stream failed",
+              });
             }
-            break;
-
-          case "nas_files":
-            if (event.nas_files) {
-              accumulatedNasFiles = [
-                ...accumulatedNasFiles,
-                ...event.nas_files,
-              ];
-            }
-            break;
-
-          case "error":
-            set({ errorMessage: event.error || "An error occurred" });
-            break;
-
-          case "done":
-            // Stream complete
-            break;
+          }
+          break; // Exit retry loop
         }
 
-        // Update the assistant message in place
-        const currentMessages = get().messages;
-        const parsed = parseStructuredContent(accumulatedContent);
-        const displayContent = get().isLoading
-          ? stripIncompleteImageMarkdown(parsed)
-          : parsed;
-
-        const updatedAssistant: Message = {
-          ...currentMessages[currentMessages.length - 1],
-          content: displayContent,
-          steps: [...accumulatedSteps],
-          image_urls: [...accumulatedImageUrls],
-          nas_files: [...accumulatedNasFiles],
-        };
-
-        set({
-          messages: [
-            ...currentMessages.slice(0, -1),
-            updatedAssistant,
-          ],
-        });
+        // Silent retry with exponential backoff
+        retryCount++;
+        const delaySec = Math.pow(2, retryCount - 1); // 1, 2, 4, 8, 16
+        set({ currentActivity: `🔄 Reconnecting... (attempt ${retryCount}/${MAX_RETRIES})` });
+        await new Promise(r => setTimeout(r, delaySec * 1000));
       }
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        set({
-          errorMessage:
-            err instanceof Error ? err.message : "Stream failed",
-        });
-      }
+    } // end while
     } finally {
       // Finalize: clean the content and compute thinking duration
       const finalMessages = get().messages;
@@ -318,6 +402,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           },
         ],
         isLoading: false,
+        isResuming: false,
         currentActivity: null,
         abortController: null,
       });
@@ -328,11 +413,30 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   stopGeneration: () => {
-    const { abortController } = get();
+    const { abortController, conversationId } = get();
     if (abortController) {
       abortController.abort();
-      set({ isLoading: false, abortController: null });
+      // Cancel the run on the server via the registry
+      if (conversationId) {
+        apiClient.cancelAgentRun(conversationId).catch(() => {});
+      }
+      set({ isLoading: false, isResuming: false, abortController: null });
     }
+  },
+
+  cancelRun: async () => {
+    const { conversationId, abortController } = get();
+    if (abortController) {
+      abortController.abort();
+    }
+    if (conversationId) {
+      try {
+        await apiClient.cancelAgentRun(conversationId);
+      } catch {
+        // Non-critical
+      }
+    }
+    set({ isLoading: false, isResuming: false, abortController: null });
   },
 
   loadConversation: async (conversationId) => {
@@ -376,6 +480,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       isTemporaryMode: temporary,
       description: desc || null,
       isLoading: false,
+      isResuming: false,
       currentActivity: null,
       iterationSummaries: [],
       errorMessage: null,

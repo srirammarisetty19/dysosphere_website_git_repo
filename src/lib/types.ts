@@ -91,7 +91,8 @@ export type StreamEventType =
   | "session"          // Session ID assignment
   | "title"            // Auto-generated title
   | "iteration_summary"
-  | "plan_update";
+  | "plan_update"
+  | "resume_status";   // Registry resume/replay indicator
 
 export interface StreamEvent {
   type: StreamEventType;
