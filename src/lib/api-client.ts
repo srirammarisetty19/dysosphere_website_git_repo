@@ -150,6 +150,19 @@ class ApiClient {
     return `${server}/api/ai/${serverPath}`;
   }
 
+  /**
+   * Resolve a relative file path (e.g. /files/user123/image.jpg) to a
+   * fully-qualified URL that can be used in <img> tags.
+   * Used by the chat UI to display uploaded images on conversation restore.
+   */
+  resolveFileUrl(path: string): string {
+    if (!path) return '';
+    // Already absolute
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    // Relative path — resolve through the API
+    return this.resolveUrl(`/api${path.startsWith('/') ? path : `/${path}`}`);
+  }
+
   // ── Core Fetch Wrapper ──────────────────────────────────────────────
 
   private async request<T>(
@@ -350,23 +363,32 @@ class ApiClient {
         name?: string;
         metadata?: Record<string, unknown>;
         images?: string[];
+        parts?: Array<{ type: string; content?: string; file_url?: string; filename?: string; mime_type?: string }>;
       }>;
     }>(`/api/history/${sessionId}`);
 
     return {
       session_id: raw.session_id,
       title: raw.title,
-      messages: (raw.messages || []).map((m) => ({
-        role: m.role as Message["role"],
-        content: m.content || "",
-        created_at: m.timestamp || new Date().toISOString(),
-        steps: (m.metadata?.steps as string[]) || [],
-        thinking_duration_sec: (m.metadata?.thinking_duration_sec as number) || 0,
-        image_urls: m.images || [],
-        attachments: [],
-        nas_files: [],
-        name: m.name || undefined, // Tool name for tool_use messages
-      })),
+      messages: (raw.messages || []).map((m) => {
+        const parts = m.parts || (m.metadata?.parts as typeof m.parts) || [];
+        // Extract image URLs from parts (preferred) or flat images (legacy)
+        const imageUrls = parts.length > 0
+          ? parts.filter((p) => p.type === "image" && p.file_url).map((p) => p.file_url!)
+          : m.images || [];
+        return {
+          role: m.role as Message["role"],
+          content: m.content || "",
+          created_at: m.timestamp || new Date().toISOString(),
+          steps: (m.metadata?.steps as string[]) || [],
+          thinking_duration_sec: (m.metadata?.thinking_duration_sec as number) || 0,
+          image_urls: imageUrls,
+          attachments: [],
+          nas_files: [],
+          parts: parts,
+          name: m.name || undefined,
+        };
+      }),
     };
   }
 
@@ -438,6 +460,20 @@ class ApiClient {
     return data.models;
   }
 
+  // ── Run Status (Gemini-style auto-resume) ────────────────────────────
+
+  /**
+   * Check if a session has an active agent generation in progress.
+   * Used by loadConversation to detect mid-generation state and auto-resume.
+   */
+  async getRunStatus(sessionId: string): Promise<{ status: string; has_active_run: boolean; session_id: string }> {
+    try {
+      return await this.request(`/api/sessions/${sessionId}/run-status`);
+    } catch {
+      return { status: "idle", has_active_run: false, session_id: sessionId };
+    }
+  }
+
   // ── Streaming ───────────────────────────────────────────────────────
 
   async *streamMessage(
@@ -447,6 +483,7 @@ class ApiClient {
       agent?: string;
       model?: string;
       images?: string[];
+      file_parts?: Array<{ file_url: string; filename: string; media_type: string; mime_type?: string }>;
       isTemporary?: boolean;
       description?: string;
       signal?: AbortSignal;
@@ -467,6 +504,7 @@ class ApiClient {
         agent: options?.agent,
         model: options?.model,
         images: options?.images,
+        file_parts: options?.file_parts,
         is_temporary: options?.isTemporary,
         description: options?.description,
       }),

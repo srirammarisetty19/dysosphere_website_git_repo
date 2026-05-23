@@ -104,6 +104,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       image_urls: [],
       attachments: [],
       nas_files: [],
+      parts: [],
     };
 
     // Create placeholder assistant message
@@ -116,6 +117,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       image_urls: [],
       attachments: [],
       nas_files: [],
+      parts: [],
       stream_started_at: new Date().toISOString(),
     };
 
@@ -130,30 +132,32 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const abortController = new AbortController();
     set({ abortController });
 
-    // Upload attachments before streaming
-    let imageContext = "";
+    // Upload attachments and build structured file parts (industry standard)
+    const fileParts: Array<{ file_url: string; filename: string; media_type: string; mime_type?: string }> = [];
     let documentContext = "";
     if (options?.attachments && options.attachments.length > 0) {
       set({ currentActivity: "Uploading files..." });
       for (const file of options.attachments) {
         try {
           const result = await apiClient.uploadFile(file);
+          const fileUrl = result.file_url || result.stored_path || "";
 
-          if (result.media_type === "image" && (result.image_id || result.id)) {
-            // Image: tell the agent to use analyze_image tool (matches server pattern)
-            const imgId = result.image_id || result.id;
-            imageContext += (
-              `[UPLOADED IMAGE: "${result.filename}" | image_id: ${imgId}]\n` +
-              `Use the analyze_image tool with image_id="${imgId}" to examine this image.\n\n`
-            );
-          } else if (result.extracted_text) {
-            // Document/audio/text: prepend extracted content as context
-            documentContext += (
-              `[UPLOADED FILE: ${result.filename} (${result.media_type})]\n` +
-              `--- File Content ---\n` +
+          // Build structured file part
+          if (fileUrl) {
+            fileParts.push({
+              file_url: fileUrl,
+              filename: result.filename,
+              media_type: result.media_type || "file",
+              mime_type: (result.metadata?.content_type as string) || "",
+            });
+          }
+
+          // For documents with extracted text, prepend as LLM context
+          if (result.media_type !== "image" && result.extracted_text) {
+            documentContext +=
+              `--- File: ${result.filename} ---\n` +
               `${result.extracted_text.slice(0, 6000)}\n` +
-              `--- End File Content ---\n\n`
-            );
+              `--- End ---\n\n`;
           }
         } catch {
           // Continue even if one upload fails
@@ -162,9 +166,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       set({ currentActivity: null });
     }
 
-    // Build the final message: prepend file context if any
-    const fileContext = imageContext + documentContext;
-    const finalMessage = fileContext ? fileContext + message : message;
+    // Build clean message — no text markers
+    const finalMessage = documentContext ? documentContext + message : message;
 
     let accumulatedContent = "";
     const accumulatedSteps: string[] = [];
@@ -206,6 +209,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           agent: options?.agent,
           model: options?.model,
           images: options?.images,
+          file_parts: fileParts.length > 0 ? fileParts : undefined,
           isTemporary: isTemporaryMode,
           description: description || undefined,
           signal: abortController.signal,
@@ -444,7 +448,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     try {
       const data = await apiClient.getConversation(conversationId);
       // Normalize server roles to UI roles and group blocks into turns
-      // Server uses: user_query, thinking, tool_use, tool_result, final_answer, assistant, system
       const rawMessages: Message[] = data.messages.map((m) => ({
         ...m,
         role: normalizeRole(m.role || "assistant"),
@@ -455,6 +458,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         image_urls: m.image_urls || [],
         attachments: m.attachments || [],
         nas_files: m.nas_files || [],
+        parts: m.parts || [],
       }));
 
       set({
@@ -464,6 +468,187 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         isLoading: false,
         isTemporaryMode: false,
       });
+
+      // ── Gemini-style auto-resume ─────────────────────────────────
+      // Check if the server has an active generation for this session.
+      // If yes, auto-reattach to the live SSE stream.
+      try {
+        const runStatus = await apiClient.getRunStatus(conversationId);
+        if (runStatus.has_active_run) {
+          console.log(`[Chat] Active run detected for session ${conversationId} — auto-resuming`);
+          // Start resume: add placeholder and stream from server
+          const currentMessages = get().messages;
+          const assistantPlaceholder: Message = {
+            role: "assistant",
+            content: "",
+            created_at: new Date().toISOString(),
+            steps: [],
+            thinking_duration_sec: 0,
+            image_urls: [],
+            attachments: [],
+            nas_files: [],
+            parts: [],
+            stream_started_at: new Date().toISOString(),
+          };
+
+          const abortController = new AbortController();
+          set({
+            messages: [...currentMessages, assistantPlaceholder],
+            isLoading: true,
+            isResuming: true,
+            currentActivity: "💭 Resuming generation...",
+            iterationSummaries: [],
+            abortController,
+          });
+
+          let accumulatedContent = "";
+          const accumulatedSteps: string[] = [];
+          let accumulatedImageUrls: string[] = [];
+          let accumulatedNasFiles: NasFileResult[] = [];
+
+          try {
+            const stream = apiClient.streamMessage("", conversationId, {
+              signal: abortController.signal,
+            });
+
+            for await (const event of stream) {
+              if (abortController.signal.aborted) break;
+
+              switch (event.type) {
+                case "token":
+                  accumulatedContent += event.content || "";
+                  break;
+                case "activity":
+                  set({ currentActivity: event.content || null });
+                  break;
+                case "status": {
+                  const statusContent = event.content || "";
+                  if (
+                    statusContent.includes("Resuming") ||
+                    statusContent.includes("Caught up") ||
+                    statusContent.includes("Replaying")
+                  ) {
+                    accumulatedContent = "";
+                    accumulatedSteps.length = 0;
+                    accumulatedImageUrls = [];
+                    accumulatedNasFiles = [];
+                    set({ isResuming: true, currentActivity: statusContent });
+                  }
+                  break;
+                }
+                case "iteration_summary":
+                  set({
+                    iterationSummaries: [
+                      ...get().iterationSummaries,
+                      event.content || "",
+                    ],
+                  });
+                  break;
+                case "tool_call":
+                  accumulatedSteps.push(`🔧 ${event.tool || "Tool"}`);
+                  break;
+                case "image":
+                  if (event.image_urls) {
+                    accumulatedImageUrls = [...accumulatedImageUrls, ...event.image_urls];
+                  }
+                  break;
+                case "nas_files":
+                  if (event.nas_files) {
+                    accumulatedNasFiles = [...accumulatedNasFiles, ...event.nas_files];
+                  }
+                  break;
+                case "error":
+                  if (event.error && event.error !== "[Generation Stopped]") {
+                    set({ errorMessage: event.error });
+                  }
+                  break;
+                case "done":
+                  break;
+              }
+
+              // Update assistant message in place
+              const msgs = get().messages;
+              const parsed = parseStructuredContent(accumulatedContent);
+              const displayContent = get().isLoading
+                ? stripIncompleteImageMarkdown(parsed)
+                : parsed;
+
+              set({
+                messages: [
+                  ...msgs.slice(0, -1),
+                  {
+                    ...msgs[msgs.length - 1],
+                    content: displayContent,
+                    steps: [...accumulatedSteps],
+                    image_urls: [...accumulatedImageUrls],
+                    nas_files: [...accumulatedNasFiles],
+                  },
+                ],
+              });
+            }
+          } catch (err) {
+            console.log("[Chat] Resume stream error:", err);
+            // On error, try reloading messages from DB
+            try {
+              const freshData = await apiClient.getConversation(conversationId);
+              const freshMessages: Message[] = freshData.messages.map((m) => ({
+                ...m,
+                role: normalizeRole(m.role || "assistant"),
+                content: parseStructuredContent(m.content || ""),
+                created_at: m.created_at || new Date().toISOString(),
+                steps: m.steps || [],
+                thinking_duration_sec: m.thinking_duration_sec || 0,
+                image_urls: m.image_urls || [],
+                attachments: m.attachments || [],
+                nas_files: m.nas_files || [],
+              }));
+              set({ messages: groupBlocksIntoTurns(freshMessages) });
+            } catch {
+              // Silent — keep whatever we have
+            }
+          } finally {
+            // Finalize: compute thinking duration and clear loading state
+            const finalMessages = get().messages;
+            const lastMsg = finalMessages[finalMessages.length - 1];
+            const streamStarted = lastMsg?.stream_started_at
+              ? new Date(lastMsg.stream_started_at)
+              : null;
+            const thinkingDuration = streamStarted
+              ? Math.round((Date.now() - streamStarted.getTime()) / 1000)
+              : 0;
+
+            const finalContent = parseStructuredContent(accumulatedContent);
+            const hasThinking =
+              finalContent.includes("<think>") && finalContent.includes("</think>");
+
+            if (accumulatedContent) {
+              set({
+                messages: [
+                  ...finalMessages.slice(0, -1),
+                  {
+                    ...lastMsg,
+                    content: finalContent,
+                    steps: [...accumulatedSteps],
+                    image_urls: [...accumulatedImageUrls],
+                    nas_files: [...accumulatedNasFiles],
+                    thinking_duration_sec: hasThinking ? thinkingDuration : 0,
+                  },
+                ],
+              });
+            }
+
+            set({
+              isLoading: false,
+              isResuming: false,
+              currentActivity: null,
+              abortController: null,
+              iterationSummaries: [],
+            });
+          }
+        }
+      } catch {
+        // run-status check failed — non-critical, just skip resume
+      }
     } catch (err) {
       set({
         isLoading: false,
@@ -630,6 +815,7 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
       let thinkContent = "";
       let assistantContent = "";
       let foundAssistant = false;
+      let turnImageUrls: string[] = [];
 
       while (i < blocks.length) {
         const b = blocks[i];
@@ -672,6 +858,10 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
           } else {
             assistantContent = sanitized;
           }
+          // Carry over image URLs from the final answer block
+          if (b.image_urls && b.image_urls.length > 0) {
+            turnImageUrls = [...turnImageUrls, ...b.image_urls];
+          }
           foundAssistant = true;
           i++;
           break;
@@ -694,9 +884,10 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
           created_at: block.created_at,
           steps,
           thinking_duration_sec: thinkingDuration,
-          image_urls: [],
+          image_urls: turnImageUrls,
           attachments: [],
           nas_files: [],
+          parts: [],
         });
       }
       continue;

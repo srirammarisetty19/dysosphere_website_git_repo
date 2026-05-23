@@ -6,11 +6,12 @@
 // ============================================================================
 
 import { useState } from "react";
-import type { Message } from "@/lib/types";
+import type { Message, MessagePart } from "@/lib/types";
 import { ThinkingBlock } from "@/components/chat/thinking-block";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
-import { Copy, Check, User, Sparkles, ExternalLink, Download } from "lucide-react";
+import { Copy, Check, User, Sparkles, ExternalLink, Download, ImageIcon } from "lucide-react";
+import { apiClient } from "@/lib/api-client";
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -32,7 +33,7 @@ export function ChatMessages({
         const isStreamingAssistant = isLast && isLoading && msg.role === "assistant";
 
         if (msg.role === "user") {
-          return <UserBubble key={index} content={msg.content} timestamp={msg.created_at} />;
+          return <UserBubble key={index} content={msg.content} imageUrls={msg.image_urls} parts={msg.parts} timestamp={msg.created_at} />;
         }
 
         if (msg.role === "assistant") {
@@ -123,7 +124,30 @@ function CopyButton({ text }: { text: string }) {
 }
 
 // ── User Bubble ─────────────────────────────────────────────────────────
-function UserBubble({ content, timestamp }: { content: string; timestamp?: string }) {
+function UserBubble({ content, imageUrls, parts, timestamp }: { content: string; imageUrls?: string[]; parts?: MessagePart[]; timestamp?: string }) {
+  const hasParts = parts && parts.length > 0;
+  const imageParts = hasParts ? parts.filter((p) => p.type === 'image' && p.file_url) : [];
+  const hasPartsImages = imageParts.length > 0;
+  const hasLegacyImages = !hasPartsImages && imageUrls && imageUrls.length > 0;
+
+  // Use text from parts (clean, no markers) or fall back to content
+  let displayContent = hasParts
+    ? parts.filter((p) => p.type === 'text').map((p) => p.content || '').join('\n').trim()
+    : content;
+
+  // Legacy cleanup: strip markers for old messages that don't have parts
+  if (!hasParts && hasLegacyImages) {
+    displayContent = displayContent
+      .replace(/\[📎 Uploaded image: [^\]]*\]\n*/g, '')
+      .replace(/\[📎 [^\]]*\]\s*/g, '')
+      .replace(/\[UPLOADED FILE: [^\]]*\]\n*--- File Content ---\n[\s\S]*?--- End File Content ---\n*/g, '')
+      .replace(/\[UPLOADED IMAGE: [^\]]*\]\n*Use the analyze_image tool[^\n]*\n*/g, '')
+      .trim();
+    if (displayContent === 'Analyze this file' || displayContent === 'Please analyze this image.' || displayContent === 'Analyze this file.') {
+      displayContent = '';
+    }
+  }
+
   return (
     <div className="group flex gap-3 py-5 justify-end">
       {/* Hover actions */}
@@ -133,11 +157,65 @@ function UserBubble({ content, timestamp }: { content: string; timestamp?: strin
 
       {/* Bubble */}
       <div className="max-w-[80%] lg:max-w-[70%]">
-        <div className="px-4 py-3 rounded-2xl rounded-br-md bg-gradient-to-br from-white/[0.08] to-white/[0.04] border border-white/[0.08]">
-          <p className="text-white text-[15px] leading-relaxed whitespace-pre-wrap">
-            {content}
-          </p>
-        </div>
+        {/* Multimodal parts images (industry standard) */}
+        {hasPartsImages && (
+          <div className="flex flex-wrap gap-2 mb-2 justify-end">
+            {imageParts.map((part, i) => (
+              <a
+                key={i}
+                href={apiClient.resolveFileUrl(part.file_url!)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group/img relative block rounded-xl overflow-hidden border border-white/[0.08] hover:border-white/20 transition-all"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={apiClient.resolveFileUrl(part.file_url!)}
+                  alt={part.filename || `Uploaded image ${i + 1}`}
+                  className="max-w-[200px] max-h-[200px] object-cover rounded-xl"
+                  loading="lazy"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              </a>
+            ))}
+          </div>
+        )}
+        {/* Legacy images (backward compat for old messages) */}
+        {hasLegacyImages && (
+          <div className="flex flex-wrap gap-2 mb-2 justify-end">
+            {imageUrls!.map((url, i) => (
+              <a
+                key={i}
+                href={apiClient.resolveFileUrl(url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group/img relative block rounded-xl overflow-hidden border border-white/[0.08] hover:border-white/20 transition-all"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={apiClient.resolveFileUrl(url)}
+                  alt={`Uploaded image ${i + 1}`}
+                  className="max-w-[200px] max-h-[200px] object-cover rounded-xl"
+                  loading="lazy"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              </a>
+            ))}
+          </div>
+        )}
+        {displayContent && (
+          <div className="px-4 py-3 rounded-2xl rounded-br-md bg-gradient-to-br from-white/[0.08] to-white/[0.04] border border-white/[0.08]">
+            <p className="text-white text-[15px] leading-relaxed whitespace-pre-wrap">
+              {displayContent}
+            </p>
+          </div>
+        )}
         {/* Timestamp */}
         {timestamp && (
           <p className="text-right text-white/0 group-hover:text-white/20 text-[10px] mt-1 mr-2 transition-colors">

@@ -54,6 +54,15 @@ export interface Conversation {
 
 export type MessageRole = "user" | "assistant" | "thinking" | "tool_use" | "tool_result" | "system";
 
+/** Industry-standard multimodal content part (OpenAI/Gemini pattern). */
+export interface MessagePart {
+  type: string; // "text" | "image" | "document" | "audio" | "file"
+  content?: string; // For text parts
+  file_url?: string; // Server-accessible URL for file parts
+  filename?: string; // Original filename
+  mime_type?: string; // MIME type
+}
+
 export interface Message {
   role: MessageRole;
   content: string;
@@ -63,8 +72,9 @@ export interface Message {
   image_urls: string[];
   attachments: string[];
   nas_files: NasFileResult[];
+  parts: MessagePart[]; // Multimodal content parts
   stream_started_at?: string;
-  name?: string; // Tool name for tool_use messages (e.g. "analyze_image")
+  name?: string;
 }
 
 export interface NasFileResult {
@@ -177,6 +187,7 @@ export interface UploadResult {
   filename: string;
   media_type: string;
   stored_path?: string;
+  file_url?: string;
   text_preview?: string;
   extracted_text?: string;
   file_size_bytes?: number;
