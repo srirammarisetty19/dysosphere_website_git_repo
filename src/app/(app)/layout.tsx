@@ -11,15 +11,30 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { apiClient } from "@/lib/api-client";
 import { AppSidebar } from "@/components/app-sidebar";
-import { Loader2, WifiOff, RefreshCw } from "lucide-react";
+import { Loader2, WifiOff, RefreshCw, PanelLeftClose } from "lucide-react";
 
 function AppLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, _hasHydrated } = useAuthStore();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    // Persist collapse state across refreshes
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ai-sidebar-collapsed") === "true";
+    }
+    return false;
+  });
   const [isServerOnline, setIsServerOnline] = useState(true);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((v) => {
+      const next = !v;
+      localStorage.setItem("ai-sidebar-collapsed", String(next));
+      return next;
+    });
+  }, []);
 
   // ── Gateway Auth Handoff (OAuth redirect pattern) ────────────────────
   useEffect(() => {
@@ -146,8 +161,25 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main layout */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <AppSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+        <AppSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebarCollapsed}
+        />
+
+        {/* Floating re-open tab — only visible on desktop when collapsed */}
+        {sidebarCollapsed && (
+          <button
+            onClick={toggleSidebarCollapsed}
+            title="Show sidebar"
+            className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-30 flex-col items-center justify-center w-5 h-16 bg-[var(--color-bg-secondary)] border border-white/[0.08] border-l-0 rounded-r-xl text-white/25 hover:text-white/60 hover:bg-white/[0.08] transition-all shadow-lg"
+          >
+            <PanelLeftClose size={13} className="rotate-180" />
+          </button>
+        )}
+
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {children}
         </main>

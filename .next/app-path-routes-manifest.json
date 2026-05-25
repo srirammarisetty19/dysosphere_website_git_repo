@@ -14,6 +14,7 @@
   "/(nas)/nas/settings/page": "/nas/settings",
   "/(nas)/nas/shared/page": "/nas/shared",
   "/(nas)/nas/starred/page": "/nas/starred",
+  "/(nas)/nas/sync/page": "/nas/sync",
   "/(nas)/nas/trash/page": "/nas/trash",
   "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found",

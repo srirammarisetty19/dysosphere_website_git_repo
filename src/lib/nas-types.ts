@@ -123,6 +123,43 @@ export interface StorageStats {
   }>;
 }
 
+// ── Folder Sync ─────────────────────────────────────────────────────────
+
+export type SyncDirection = "upload" | "download" | "bidirectional";
+export type SyncDeviceType = "android" | "ios" | "macos" | "windows" | "linux";
+export type SyncDeletePolicy = "propagate" | "keep_remote";
+
+export interface SyncFolder {
+  id: string;
+  local_path: string;
+  device_id: string;
+  device_name: string | null;
+  device_type: SyncDeviceType;
+  directory_id: string;
+  directory_name?: string;
+  directory_path?: string;
+  sync_enabled: boolean;
+  sync_direction: SyncDirection;
+  wifi_only: boolean;
+  sync_frequency: string;       // "realtime" | "hourly" | "daily"
+  delete_policy: SyncDeletePolicy;
+  last_synced_at: string | null;
+  last_cursor: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SyncFolderStatus {
+  sync_folder_id: string;
+  local_path: string;
+  device_name: string | null;
+  sync_enabled: boolean;
+  last_synced_at: string | null;
+  pending_changes: number;
+  synced_files: number;
+  status: "synced" | "pending" | "disabled";
+}
+
 // ── Sort / Filter Enums ─────────────────────────────────────────────────
 
 export type SortBy = "name" | "date" | "size" | "type";

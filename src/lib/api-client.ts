@@ -214,7 +214,16 @@ class ApiClient {
       let errorMessage: string;
       try {
         const errorData = await response.json();
-        errorMessage = errorData.detail || errorData.message || response.statusText;
+        const detail = errorData.detail;
+        if (typeof detail === "string") {
+          errorMessage = detail;
+        } else if (Array.isArray(detail) && detail.length > 0) {
+          // FastAPI 422 validation error: detail is [{loc, msg, type}]
+          const msg = detail[0]?.msg ?? "Validation error";
+          errorMessage = msg.replace(/^Value error,\s*/i, "");
+        } else {
+          errorMessage = errorData.message ?? response.statusText;
+        }
       } catch {
         errorMessage = response.statusText;
       }

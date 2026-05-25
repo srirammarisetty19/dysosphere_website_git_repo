@@ -182,6 +182,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../src/app/(nas)/nas/sync/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/nas/sync">> = Specific
+  const handler = {} as typeof import("../../src/app/(nas)/nas/sync/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../src/app/(nas)/nas/trash/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/nas/trash">> = Specific

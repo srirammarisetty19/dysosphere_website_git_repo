@@ -157,6 +157,12 @@
       "namedRegex": "^/nas/starred(?:/)?$"
     },
     {
+      "page": "/nas/sync",
+      "regex": "^/nas/sync(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nas/sync(?:/)?$"
+    },
+    {
       "page": "/nas/trash",
       "regex": "^/nas/trash(?:/)?$",
       "routeKeys": {},

@@ -24,15 +24,19 @@ import {
   Search,
   X,
   ChevronRight,
+  PanelLeftClose,
+  FolderSync,
 } from "lucide-react";
 import Image from "next/image";
 
 interface NasSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function NasSidebar({ isOpen, onClose }: NasSidebarProps) {
+export function NasSidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse }: NasSidebarProps) {
   const pathname = usePathname();
   const [storageUsed, setStorageUsed] = useState(0);
   const [storageLimit, setStorageLimit] = useState(1);
@@ -82,6 +86,7 @@ export function NasSidebar({ isOpen, onClose }: NasSidebarProps) {
 
   const drawerNav = [
     { href: "/nas/search", icon: Search, label: "Search" },
+    { href: "/nas/sync", icon: FolderSync, label: "Folder Sync" },
     { href: "/nas/trash", icon: Trash2, label: "Trash" },
     {
       href: "/nas/notifications",
@@ -105,26 +110,41 @@ export function NasSidebar({ isOpen, onClose }: NasSidebarProps) {
       {/* Desktop Sidebar */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-40 w-[280px] flex flex-col
+          fixed inset-y-0 left-0 z-40 flex flex-col
           bg-bg-secondary border-r border-border-subtle
-          transition-transform duration-200 ease-in-out
+          transition-all duration-300 ease-in-out
           lg:relative lg:translate-x-0
-          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+          ${isOpen ? "translate-x-0 w-[280px]" : "-translate-x-full"}
+          ${isCollapsed ? "lg:-translate-x-full lg:w-0 lg:border-r-0" : "lg:w-[280px]"}
+          overflow-hidden
         `}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-border-subtle">
+        <div className="flex items-center gap-3 px-6 py-5 border-b border-border-subtle shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/DS.svg" alt="DS" className="h-7 w-auto" />
-          <span className="text-lg font-semibold tracking-tight text-text-primary">
+          <img src="/DS.svg" alt="DS" className="h-7 w-auto shrink-0" />
+          <span className="text-lg font-semibold tracking-tight text-text-primary truncate">
             SphereX NAS
           </span>
-          <button
-            onClick={onClose}
-            className="ml-auto p-1 rounded-md hover:bg-white/5 lg:hidden"
-          >
-            <X className="h-5 w-5 text-text-tertiary" />
-          </button>
+          <div className="ml-auto flex items-center gap-1 shrink-0">
+            {/* Desktop collapse button */}
+            {onToggleCollapse && (
+              <button
+                onClick={onToggleCollapse}
+                title="Hide sidebar"
+                className="hidden lg:flex p-1.5 rounded-md hover:bg-white/5 text-text-tertiary hover:text-text-secondary transition-colors"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
+            )}
+            {/* Mobile close button */}
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md hover:bg-white/5 lg:hidden"
+            >
+              <X className="h-5 w-5 text-text-tertiary" />
+            </button>
+          </div>
         </div>
 
         {/* Main Navigation */}

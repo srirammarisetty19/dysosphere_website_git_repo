@@ -20,6 +20,10 @@ import type {
   ShareItem,
   ItemAccess,
   TrashItem,
+  SyncFolder,
+  SyncFolderStatus,
+  SyncDirection,
+  SyncDeletePolicy,
 } from "./nas-types";
 
 class NasApiClientError extends Error {
@@ -89,6 +93,7 @@ class NasApiClient {
       "nas-notifications": "api/nas/notifications",
       "nas-people": "api/nas/people",
       "nas-health": "api/nas/health",
+      "nas-sync": "api/nas/sync",
       "nas-thumb": "api/nas/files/thumbnail",
       "nas-face-thumb": "api/nas/people/face-thumbnail",
     };
@@ -122,10 +127,16 @@ class NasApiClient {
       let message = `Server error (${response.status})`;
       try {
         const data = await response.json();
-        message =
-          data.detail ||
-          data.message ||
-          (Array.isArray(data.detail) ? data.detail[0]?.msg : message);
+        const detail = data.detail;
+        if (typeof detail === "string") {
+          message = detail;
+        } else if (Array.isArray(detail) && detail.length > 0) {
+          // FastAPI 422 validation error: detail is [{loc, msg, type}]
+          const msg = detail[0]?.msg ?? "Validation error";
+          message = msg.replace(/^Value error,\s*/i, "");
+        } else {
+          message = data.message ?? message;
+        }
       } catch {
         // non-JSON error
       }
@@ -597,6 +608,70 @@ class NasApiClient {
     await this.request(`/api/nas-people/clusters/${clusterId}/unhide`, {
       method: "POST",
     });
+  }
+
+  // ── Folder Sync ────────────────────────────────────────────────
+
+  async listSyncFolders(deviceId?: string): Promise<{ sync_folders: SyncFolder[]; count: number }> {
+    const params = new URLSearchParams();
+    if (deviceId) params.set("device_id", deviceId);
+    const qs = params.toString();
+    return this.request(`/api/nas-sync/folders${qs ? `?${qs}` : ""}`);
+  }
+
+  async updateSyncFolder(
+    folderId: string,
+    settings: {
+      sync_enabled?: boolean;
+      sync_direction?: SyncDirection;
+      wifi_only?: boolean;
+      sync_frequency?: string;
+      delete_policy?: SyncDeletePolicy;
+    }
+  ): Promise<void> {
+    const formData = new FormData();
+    if (settings.sync_enabled !== undefined)
+      formData.append("sync_enabled", String(settings.sync_enabled));
+    if (settings.sync_direction)
+      formData.append("sync_direction", settings.sync_direction);
+    if (settings.wifi_only !== undefined)
+      formData.append("wifi_only", String(settings.wifi_only));
+    if (settings.sync_frequency)
+      formData.append("sync_frequency", settings.sync_frequency);
+    if (settings.delete_policy)
+      formData.append("delete_policy", settings.delete_policy);
+    await this.request(`/api/nas-sync/folders/${folderId}`, {
+      method: "PUT",
+      body: formData,
+    });
+  }
+
+  async deleteSyncFolder(folderId: string): Promise<void> {
+    await this.request(`/api/nas-sync/folders/${folderId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getSyncStatus(deviceId?: string): Promise<{ folders: SyncFolderStatus[] }> {
+    const params = new URLSearchParams();
+    if (deviceId) params.set("device_id", deviceId);
+    const qs = params.toString();
+    return this.request(`/api/nas-sync/status${qs ? `?${qs}` : ""}`);
+  }
+
+  async getSyncChanges(
+    cursor = 0,
+    limit = 500,
+    directoryId?: string,
+    deviceId?: string
+  ): Promise<{ changes: unknown[]; cursor: number; has_more: boolean; count: number }> {
+    const params = new URLSearchParams({
+      cursor: String(cursor),
+      limit: String(limit),
+    });
+    if (directoryId) params.set("directory_id", directoryId);
+    if (deviceId) params.set("device_id", deviceId);
+    return this.request(`/api/nas-sync/changes?${params}`);
   }
 
   // ── Health ──────────────────────────────────────────────────────────

@@ -23,6 +23,7 @@ import {
   Zap,
   Menu,
   FileText,
+  PanelLeftClose,
 } from "lucide-react";
 import { useChatStore } from "@/stores/chat-store";
 import { DSLogo } from "@/components/ui/ds-logo";
@@ -30,6 +31,8 @@ import { DSLogo } from "@/components/ui/ds-logo";
 interface AppSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const NAV_ITEMS = [
@@ -40,7 +43,7 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
+export function AppSidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse }: AppSidebarProps) {
   const pathname = usePathname();
   const isChat = pathname === "/chat";
 
@@ -58,10 +61,12 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
       <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50
-          w-72 bg-[var(--color-bg-secondary)] border-r border-white/[0.06]
+          bg-[var(--color-bg-secondary)] border-r border-white/[0.06]
           flex flex-col
-          transition-transform duration-300 ease-out
-          ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          transition-all duration-300 ease-out
+          ${isOpen ? "translate-x-0 w-72" : "-translate-x-full lg:translate-x-0"}
+          ${isCollapsed ? "lg:-translate-x-full lg:w-0 lg:border-r-0" : "lg:w-72"}
+          overflow-hidden
         `}
       >
         {/* Header */}
@@ -72,12 +77,25 @@ export function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
               Sphere AI
             </span>
           </div>
-          <button
-            onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Desktop collapse button */}
+            {onToggleCollapse && (
+              <button
+                onClick={onToggleCollapse}
+                title="Hide sidebar"
+                className="hidden lg:flex p-1.5 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
+              >
+                <PanelLeftClose size={16} />
+              </button>
+            )}
+            {/* Mobile close button */}
+            <button
+              onClick={onClose}
+              className="lg:hidden p-1.5 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Navigation */}

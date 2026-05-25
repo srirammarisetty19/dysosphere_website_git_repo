@@ -10,15 +10,29 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { nasApiClient } from "@/lib/nas-api-client";
 import { NasSidebar } from "@/components/nas/nas-sidebar";
-import { Loader2, WifiOff, RefreshCw } from "lucide-react";
+import { Loader2, WifiOff, RefreshCw, PanelLeftClose } from "lucide-react";
 
 function NasLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, _hasHydrated } = useAuthStore();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("nas-sidebar-collapsed") === "true";
+    }
+    return false;
+  });
   const [isServerOnline, setIsServerOnline] = useState(true);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((v) => {
+      const next = !v;
+      localStorage.setItem("nas-sidebar-collapsed", String(next));
+      return next;
+    });
+  }, []);
 
   // ── Gateway Auth Handoff ────────────────────────────────────────────
   useEffect(() => {
@@ -121,7 +135,20 @@ function NasLayoutInner({ children }: { children: React.ReactNode }) {
       <NasSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapsed}
       />
+
+      {/* Floating re-open tab — desktop only, visible when collapsed */}
+      {sidebarCollapsed && (
+        <button
+          onClick={toggleSidebarCollapsed}
+          title="Show sidebar"
+          className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-30 flex-col items-center justify-center w-5 h-16 bg-bg-secondary border border-border-subtle border-l-0 rounded-r-xl text-text-tertiary hover:text-text-primary hover:bg-white/5 transition-all shadow-lg"
+        >
+          <PanelLeftClose size={13} className="rotate-180" />
+        </button>
+      )}
 
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
