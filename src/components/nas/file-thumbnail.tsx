@@ -176,7 +176,7 @@ export function FolderIcon({
   const sizeClasses = {
     sm: "h-5 w-5",
     md: "h-10 w-10",
-    lg: "h-12 w-12",
+    lg: "h-10 w-10",
   };
 
   return (

@@ -229,8 +229,8 @@ export function isPreviewable(mimeType: string | null): boolean {
   );
 }
 
-/** Match file type filter */
-export function matchesFilter(
+/** Match file type filter (single) */
+function matchesSingleFilter(
   item: DisplayItem,
   filter: FileTypeFilter
 ): boolean {
@@ -259,4 +259,21 @@ export function matchesFilter(
     default:
       return true;
   }
+}
+
+/** Match file type filter — supports single value or multi-select Set */
+export function matchesFilter(
+  item: DisplayItem,
+  filter: FileTypeFilter | Set<FileTypeFilter>
+): boolean {
+  if (filter instanceof Set) {
+    if (filter.size === 0 || filter.has("all")) return true;
+    // Directories always pass through when "folders" isn't the only filter
+    if (item.kind === "directory" && !filter.has("folders")) return true;
+    for (const f of filter) {
+      if (matchesSingleFilter(item, f)) return true;
+    }
+    return false;
+  }
+  return matchesSingleFilter(item, filter);
 }

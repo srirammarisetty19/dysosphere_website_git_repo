@@ -4,7 +4,7 @@
 // NAS Home — File Browser (Google Drive-style)
 // ============================================================================
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNasFilesStore } from "@/stores/nas-files-store";
 import { nasApiClient } from "@/lib/nas-api-client";
 import type { DisplayItem, FileTypeFilter } from "@/lib/nas-types";
@@ -16,6 +16,8 @@ import { FileContextMenu } from "@/components/nas/file-context-menu";
 import { UploadZone } from "@/components/nas/upload-zone";
 import { FileViewerModal } from "@/components/nas/file-viewer-modal";
 import { FileDetailsPanel } from "@/components/nas/file-details-panel";
+import { FilterPopover } from "@/components/nas/filter-popover";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Grid3X3,
   List,
@@ -35,7 +37,9 @@ import {
   X,
   Check,
   Palette,
+  Sparkles,
 } from "lucide-react";
+import Link from "next/link";
 
 // Folder color palette — matches Flutter app's ColorPickerDialog
 const FOLDER_COLORS = [
@@ -54,14 +58,7 @@ const FOLDER_COLORS = [
   "#9C27B0", // purple
 ];
 
-const FILTER_OPTIONS: { value: FileTypeFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "folders", label: "Folders" },
-  { value: "images", label: "Images" },
-  { value: "videos", label: "Videos" },
-  { value: "audio", label: "Audio" },
-  { value: "documents", label: "Documents" },
-];
+// FILTER_OPTIONS removed — now handled by FilterPopover component
 
 export default function NasHomePage() {
   const {
@@ -73,6 +70,7 @@ export default function NasHomePage() {
     sortBy,
     sortOrder,
     typeFilter,
+    typeFilters,
     isSelecting,
     selectedIds,
     loadDirectory,
@@ -83,6 +81,8 @@ export default function NasHomePage() {
     setSortBy,
     setSortOrder,
     setTypeFilter,
+    toggleTypeFilter,
+    clearTypeFilters,
     toggleSelection,
     selectAll,
     clearSelection,
@@ -104,10 +104,56 @@ export default function NasHomePage() {
   const [renameName, setRenameName] = useState("");
   const [colorPickerItem, setColorPickerItem] = useState<DisplayItem | null>(null);
 
+  // ── Inline search state ──────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<DisplayItem[]>([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // Load initial directory
   useEffect(() => {
     loadDirectory(null);
   }, [loadDirectory]);
+
+  // ── Inline search handler ───────────────────────────────────────────
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      if (!value.trim()) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+      setIsSearching(true);
+      searchDebounceRef.current = setTimeout(async () => {
+        try {
+          const data = await nasApiClient.searchFiles(value.trim());
+          const items: DisplayItem[] = data.map((raw: any) => {
+            const isDir = raw.parent_id !== undefined && !raw.mime_type;
+            return isDir
+              ? { kind: "directory" as const, item: raw }
+              : { kind: "file" as const, item: raw };
+          });
+          setSearchResults(items);
+        } catch {
+          setSearchResults([]);
+        } finally {
+          setIsSearching(false);
+        }
+      }, 350);
+    },
+    []
+  );
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+    setSearchResults([]);
+    setIsSearchFocused(false);
+    setIsSearching(false);
+  }, []);
 
   // ── Build display items ─────────────────────────────────────────────
   const buildItems = useCallback((): DisplayItem[] => {
@@ -121,8 +167,9 @@ export default function NasHomePage() {
       ),
     ];
 
-    // Filter
-    const filtered = items.filter((i) => matchesFilter(i, typeFilter));
+    // Filter — use multi-select Set if any are active, else show all
+    const activeFilter = typeFilters.size > 0 ? typeFilters : typeFilter;
+    const filtered = items.filter((i) => matchesFilter(i, activeFilter));
 
     // Sort
     filtered.sort((a, b) => {
@@ -161,7 +208,7 @@ export default function NasHomePage() {
     });
 
     return filtered;
-  }, [listing, typeFilter, sortBy, sortOrder]);
+  }, [listing, typeFilter, typeFilters, sortBy, sortOrder]);
 
   const displayItems = buildItems();
 
@@ -296,8 +343,121 @@ export default function NasHomePage() {
   return (
     <UploadZone directoryId={currentDirectoryId}>
       <div className="flex flex-col h-full">
-        {/* Top Bar */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border-subtle">
+        {/* ── Google Drive-style Search Bar ─────────────────────────────── */}
+        <div className="relative px-4 pt-3 pb-2">
+          <div
+            className={`
+              relative flex items-center rounded-2xl transition-all duration-200
+              ${
+                isSearchFocused
+                  ? "bg-bg-elevated border border-accent-blue/30 shadow-lg shadow-accent-blue/5"
+                  : "bg-white/[0.06] border border-border-subtle hover:bg-white/[0.08] hover:shadow-md"
+              }
+            `}
+          >
+            <Search className="absolute left-4 h-5 w-5 text-text-tertiary pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  clearSearch();
+                  searchInputRef.current?.blur();
+                }
+              }}
+              placeholder="Search in NAS"
+              className="w-full pl-12 pr-24 py-3 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none"
+            />
+            <div className="absolute right-3 flex items-center gap-1.5">
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-text-tertiary hover:text-text-secondary transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              <Link
+                href="/nas/search"
+                title="AI Semantic Search"
+                className="p-1.5 rounded-lg hover:bg-white/10 text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                <Sparkles className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          {/* ── Inline search results dropdown ───────────────────────── */}
+          {isSearchFocused && searchQuery.trim() && (
+            <>
+              <div
+                className="fixed inset-0 z-30"
+                onClick={clearSearch}
+              />
+              <div className="absolute left-4 right-4 top-full mt-1 z-40 max-h-[60vh] overflow-y-auto rounded-xl border border-border-subtle bg-bg-secondary shadow-2xl animate-search-results">
+                {isSearching ? (
+                  <div className="flex items-center gap-3 px-5 py-4">
+                    <Loader2 className="h-4 w-4 animate-spin text-accent-blue" />
+                    <span className="text-sm text-text-secondary">Searching...</span>
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="px-5 py-4 text-sm text-text-tertiary">
+                    No results for &ldquo;{searchQuery}&rdquo;
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-4 py-2 text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
+                      {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}
+                    </div>
+                    {searchResults.slice(0, 8).map((item) => (
+                      <button
+                        key={item.item.id}
+                        onClick={() => {
+                          if (item.kind === "directory") {
+                            navigateToFolder(item.item as any);
+                          } else {
+                            setViewerItem(item);
+                          }
+                          clearSearch();
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-white/[0.04] transition-colors text-left"
+                      >
+                        <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                          {item.kind === "directory" ? (
+                            <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                            </svg>
+                          ) : (
+                            <Search className="h-4 w-4 text-text-tertiary" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-text-primary truncate">{item.item.name}</p>
+                          <p className="text-[11px] text-text-tertiary truncate">{item.item.path}</p>
+                        </div>
+                      </button>
+                    ))}
+                    {searchResults.length > 8 && (
+                      <Link
+                        href={`/nas/search?q=${encodeURIComponent(searchQuery)}`}
+                        onClick={clearSearch}
+                        className="flex items-center gap-2 px-4 py-3 text-sm text-accent-blue hover:bg-white/[0.04] border-t border-border-subtle"
+                      >
+                        <Search className="h-4 w-4" />
+                        See all {searchResults.length} results
+                      </Link>
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ── Unified Toolbar: Breadcrumbs + Filter + Sort + View ───────── */}
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-border-subtle">
           {/* Mobile menu button */}
           <button className="p-2 rounded-lg hover:bg-white/5 lg:hidden">
             <Menu className="h-5 w-5 text-text-secondary" />
@@ -311,20 +471,69 @@ export default function NasHomePage() {
             />
           </div>
 
-          {/* Search */}
-          <button
-            onClick={() => (window.location.href = "/nas/search")}
-            className="p-2 rounded-lg hover:bg-white/5 text-text-secondary"
-          >
-            <Search className="h-5 w-5" />
-          </button>
+          {/* Filter popover */}
+          <FilterPopover
+            activeFilters={typeFilters}
+            onToggle={toggleTypeFilter}
+            onClear={clearTypeFilters}
+          />
+
+          {/* Sort dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSortMenu(!showSortMenu)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-text-secondary hover:bg-white/5 transition-colors"
+            >
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              <span className="capitalize hidden sm:inline">{sortBy}</span>
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            {showSortMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowSortMenu(false)}
+                />
+                <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl border border-border-subtle bg-bg-secondary shadow-xl py-1 animate-popover-in">
+                {(["name", "date", "size", "type"] as const).map((sb) => (
+                  <button
+                    key={sb}
+                    onClick={() => {
+                      if (sortBy === sb) {
+                        setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortBy(sb);
+                      }
+                      setShowSortMenu(false);
+                    }}
+                    className={`
+                      flex items-center justify-between w-full px-4 py-2 text-sm transition-colors
+                      ${
+                        sortBy === sb
+                          ? "text-accent-blue"
+                          : "text-text-secondary hover:text-text-primary hover:bg-white/5"
+                      }
+                    `}
+                  >
+                    <span className="capitalize">{sb}</span>
+                    {sortBy === sb && (
+                      <span className="text-xs">
+                        {sortOrder === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              </>
+            )}
+          </div>
 
           {/* View toggle */}
           <button
             onClick={() =>
               setViewType(viewType === "grid" ? "list" : "grid")
             }
-            className="p-2 rounded-lg hover:bg-white/5 text-text-secondary"
+            className="p-2 rounded-lg hover:bg-white/5 text-text-secondary transition-colors"
             title={viewType === "grid" ? "Switch to list" : "Switch to grid"}
           >
             {viewType === "grid" ? (
@@ -372,126 +581,66 @@ export default function NasHomePage() {
           </div>
         )}
 
-        {/* Filter Bar + Sort */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-border-subtle overflow-x-auto scrollbar-none">
-          {/* Type filters */}
-          {FILTER_OPTIONS.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setTypeFilter(value)}
-              className={`
-                px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors
-                ${
-                  typeFilter === value
-                    ? "bg-accent-blue/15 text-accent-blue border border-accent-blue/30"
-                    : "bg-white/5 text-text-secondary hover:bg-white/10 border border-transparent"
-                }
-              `}
-            >
-              {label}
-            </button>
-          ))}
+        {/* Content — cross-fade via framer-motion, toolbar stays stable */}
+        <div className="flex-1 overflow-y-auto relative">
+          {/* Loading overlay — shows on top of old content instead of replacing it */}
+          {isLoading && (
+            <div className="loading-overlay" />
+          )}
 
-          <div className="flex-1" />
-
-          {/* Sort dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowSortMenu(!showSortMenu)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-text-secondary hover:bg-white/5"
-            >
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              <span className="capitalize">{sortBy}</span>
-              <ChevronDown className="h-3 w-3" />
-            </button>
-            {showSortMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowSortMenu(false)}
-                />
-                <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl border border-border-subtle bg-bg-secondary shadow-xl py-1">
-                {(["name", "date", "size", "type"] as const).map((sb) => (
-                  <button
-                    key={sb}
-                    onClick={() => {
-                      if (sortBy === sb) {
-                        setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                      } else {
-                        setSortBy(sb);
-                      }
-                      setShowSortMenu(false);
-                    }}
-                    className={`
-                      flex items-center justify-between w-full px-4 py-2 text-sm
-                      ${
-                        sortBy === sb
-                          ? "text-accent-blue"
-                          : "text-text-secondary hover:text-text-primary hover:bg-white/5"
-                      }
-                    `}
-                  >
-                    <span className="capitalize">{sb}</span>
-                    {sortBy === sb && (
-                      <span className="text-xs">
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-accent-blue" />
-            </div>
-          ) : error ? (
+          {error ? (
             <div className="flex flex-col items-center justify-center py-20 text-red-400">
               <p className="text-sm">{error}</p>
               <button
                 onClick={() => loadDirectory(currentDirectoryId)}
-                className="mt-3 px-4 py-2 rounded-lg bg-white/5 text-sm hover:bg-white/10"
+                className="mt-3 px-4 py-2 rounded-lg bg-white/5 text-sm hover:bg-white/10 transition-colors"
               >
                 Retry
               </button>
             </div>
-          ) : viewType === "grid" ? (
-            <FileGridView
-              items={displayItems}
-              selectedIds={selectedIds}
-              isSelecting={isSelecting}
-              onFolderTap={(item) => {
-                if (item.kind === "directory") navigateToFolder(item.item);
-              }}
-              onFileTap={(item) => setViewerItem(item)}
-              onContextMenu={(item, e) =>
-                setContextMenu({ item, position: { x: e.clientX, y: e.clientY } })
-              }
-              onToggleSelect={(id) => toggleSelection(id)}
-              onLongPress={(item) => {
-                toggleSelection(item.item.id);
-              }}
-            />
           ) : (
-            <FileListView
-              items={displayItems}
-              selectedIds={selectedIds}
-              isSelecting={isSelecting}
-              onFolderTap={(item) => {
-                if (item.kind === "directory") navigateToFolder(item.item);
-              }}
-              onFileTap={(item) => setViewerItem(item)}
-              onContextMenu={(item, e) =>
-                setContextMenu({ item, position: { x: e.clientX, y: e.clientY } })
-              }
-              onToggleSelect={(id) => toggleSelection(id)}
-            />
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentDirectoryId ?? "__root__"}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+              >
+                {viewType === "grid" ? (
+                  <FileGridView
+                    items={displayItems}
+                    selectedIds={selectedIds}
+                    isSelecting={isSelecting}
+                    onFolderTap={(item) => {
+                      if (item.kind === "directory") navigateToFolder(item.item);
+                    }}
+                    onFileTap={(item) => setViewerItem(item)}
+                    onContextMenu={(item, e) =>
+                      setContextMenu({ item, position: { x: e.clientX, y: e.clientY } })
+                    }
+                    onToggleSelect={(id) => toggleSelection(id)}
+                    onLongPress={(item) => {
+                      toggleSelection(item.item.id);
+                    }}
+                  />
+                ) : (
+                  <FileListView
+                    items={displayItems}
+                    selectedIds={selectedIds}
+                    isSelecting={isSelecting}
+                    onFolderTap={(item) => {
+                      if (item.kind === "directory") navigateToFolder(item.item);
+                    }}
+                    onFileTap={(item) => setViewerItem(item)}
+                    onContextMenu={(item, e) =>
+                      setContextMenu({ item, position: { x: e.clientX, y: e.clientY } })
+                    }
+                    onToggleSelect={(id) => toggleSelection(id)}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
           )}
         </div>
 
@@ -512,7 +661,7 @@ export default function NasHomePage() {
                   className="fixed inset-0 z-10"
                   onClick={() => setShowNewMenu(false)}
                 />
-                <div className="absolute bottom-14 right-0 z-20 w-48 rounded-xl border border-border-subtle bg-bg-secondary shadow-2xl py-1.5">
+                <div className="absolute bottom-14 right-0 z-20 w-48 rounded-xl border border-border-subtle bg-bg-secondary shadow-2xl py-1.5 backdrop-blur-md animate-popover-in">
                   <button
                     onClick={() => {
                       setShowNewMenu(false);
@@ -587,8 +736,8 @@ export default function NasHomePage() {
 
       {/* New Folder Dialog */}
       {showNewFolderDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-96 rounded-2xl border border-border-subtle bg-bg-secondary p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-modal-bg">
+          <div className="w-96 rounded-2xl border border-border-subtle bg-bg-secondary p-6 shadow-2xl animate-modal-content">
             <h3 className="text-lg font-semibold text-text-primary mb-4">
               New folder
             </h3>
@@ -623,8 +772,8 @@ export default function NasHomePage() {
 
       {/* Rename Dialog */}
       {renameItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-96 rounded-2xl border border-border-subtle bg-bg-secondary p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-modal-bg">
+          <div className="w-96 rounded-2xl border border-border-subtle bg-bg-secondary p-6 shadow-2xl animate-modal-content">
             <h3 className="text-lg font-semibold text-text-primary mb-4">
               Rename
             </h3>
@@ -658,8 +807,8 @@ export default function NasHomePage() {
 
       {/* Color Picker Dialog */}
       {colorPickerItem && colorPickerItem.kind === "directory" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-80 rounded-2xl border border-border-subtle bg-bg-secondary p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-modal-bg">
+          <div className="w-80 rounded-2xl border border-border-subtle bg-bg-secondary p-6 shadow-2xl animate-modal-content">
             <h3 className="text-lg font-semibold text-text-primary mb-1">
               Select Color
             </h3>

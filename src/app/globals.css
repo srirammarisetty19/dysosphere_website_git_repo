@@ -269,8 +269,222 @@ body {
   animation: slide-in-top 0.3s ease-out;
 }
 
+/* ── NAS Folder Content Fade-In ───────────────────────────────────────── */
+@keyframes content-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-content-in {
+  animation: content-fade-in 0.2s ease-out both;
+}
+
+/* ── NAS Staggered Grid Item Entry ────────────────────────────────────── */
+@keyframes grid-item-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-grid-item {
+  animation: grid-item-in 0.25s ease-out both;
+}
+
+/* ── NAS Staggered List Row Entry ─────────────────────────────────────── */
+@keyframes list-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-list-row {
+  animation: list-row-in 0.2s ease-out both;
+}
+
+/* ── NAS Search Bar Glow ──────────────────────────────────────────────── */
+@keyframes search-glow {
+  from {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  to {
+    box-shadow: 0 2px 12px rgba(52, 118, 252, 0.15), 0 0 0 2px rgba(52, 118, 252, 0.12);
+  }
+}
+
+/* ── NAS Search Results Slide Down ────────────────────────────────────── */
+@keyframes search-results-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-search-results {
+  animation: search-results-in 0.15s ease-out both;
+}
+
 /* ── Keyboard Shortcut Keys ───────────────────────────────────────────── */
 kbd {
   font-family: var(--font-mono), 'Menlo', monospace;
+}
+
+/* ── Filter Popover Scale-In ─────────────────────────────────────────── */
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-popover-in {
+  animation: popover-in 0.15s ease-out both;
+}
+
+/* ── Modal Backdrop + Content ────────────────────────────────────────── */
+@keyframes modal-bg-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-content-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-bg {
+  animation: modal-bg-in 0.2s ease-out both;
+}
+
+.animate-modal-content {
+  animation: modal-content-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Breadcrumb Segment Slide-In ─────────────────────────────────────── */
+@keyframes breadcrumb-segment-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-breadcrumb-in {
+  animation: breadcrumb-segment-in 0.2s ease-out both;
+}
+
+/* ── Folder Content Cross-Fade ───────────────────────────────────────── */
+@keyframes content-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes content-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+
+/* ── List Row Hover Accent ───────────────────────────────────────────── */
+.list-row-hover {
+  position: relative;
+}
+
+.list-row-hover::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-accent-blue);
+  opacity: 0;
+  transform: scaleY(0.5);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.list-row-hover:hover::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+/* ── Selection Checkbox Pulse ────────────────────────────────────────── */
+@keyframes selection-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 118, 252, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(52, 118, 252, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 118, 252, 0); }
+}
+
+.animate-selection-pulse {
+  animation: selection-pulse 0.4s ease-out;
+}
+
+/* ── Loading Overlay Shimmer ─────────────────────────────────────────── */
+@keyframes loading-overlay-pulse {
+  0%, 100% { opacity: 0.03; }
+  50% { opacity: 0.06; }
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--color-accent-blue), transparent);
+  opacity: 0.03;
+  animation: loading-overlay-pulse 1.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Scrollbar hidden utility ────────────────────────────────────────── */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 

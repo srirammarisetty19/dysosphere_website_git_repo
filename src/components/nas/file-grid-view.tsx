@@ -2,6 +2,7 @@
 
 // ============================================================================
 // File Grid View — Google Drive card layout
+// Uses CSS Grid auto-fill for responsive column sizing
 // ============================================================================
 
 import type { DisplayItem } from "@/lib/nas-types";
@@ -31,37 +32,46 @@ export function FileGridView({
 }: FileGridViewProps) {
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-text-tertiary">
-        <div className="h-16 w-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-          <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="flex flex-col items-center justify-center py-24 text-text-tertiary">
+        <div className="h-20 w-20 rounded-2xl border-2 border-dashed border-border-default flex items-center justify-center mb-5">
+          <svg className="h-9 w-9 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
         </div>
-        <p className="text-sm">This folder is empty</p>
-        <p className="text-xs mt-1">Drop files here to upload</p>
+        <p className="text-sm font-medium text-text-secondary">No files here yet</p>
+        <p className="text-xs mt-1.5 text-text-tertiary">Drop files or click &ldquo;New&rdquo; to get started</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4">
-      {items.map((item) => {
+    <div
+      className="p-4 grid gap-3"
+      style={{
+        gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
+      }}
+    >
+      {items.map((item, index) => {
         const id = item.kind === "directory" ? item.item.id : item.item.id;
         const name =
           item.kind === "directory" ? item.item.name : item.item.name;
         const isSelected = selectedIds.has(id);
+        const folderColor =
+          item.kind === "directory" ? item.item.color : null;
 
         return (
           <div
             key={id}
             className={`
-              group relative rounded-xl border transition-all duration-150 cursor-pointer
+              group relative rounded-xl border transition-all duration-200 cursor-pointer
+              animate-grid-item
               ${
                 isSelected
                   ? "border-accent-blue bg-accent-blue/8 ring-1 ring-accent-blue/30"
-                  : "border-border-subtle bg-bg-tertiary hover:border-border-default hover:bg-bg-elevated"
+                  : "border-border-subtle bg-bg-tertiary hover:border-border-default hover:bg-bg-elevated hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5"
               }
             `}
+            style={{ animationDelay: `${Math.min(index, 15) * 30}ms` }}
             onClick={() => {
               if (isSelecting) {
                 onToggleSelect(id);
@@ -83,10 +93,17 @@ export function FileGridView({
             {/* Thumbnail area */}
             <div className="relative aspect-[4/3] rounded-t-xl overflow-hidden">
               {item.kind === "directory" ? (
-                <div className="h-full w-full flex items-center justify-center bg-white/[0.02]">
+                <div
+                  className="h-full w-full flex items-center justify-center transition-colors duration-200"
+                  style={{
+                    background: folderColor
+                      ? `linear-gradient(135deg, ${folderColor}08, ${folderColor}15)`
+                      : "rgba(255,255,255,0.02)",
+                  }}
+                >
                   <FolderIcon
-                    color={item.item.color}
-                    size="lg"
+                    color={folderColor}
+                    size="md"
                   />
                 </div>
               ) : (
@@ -102,7 +119,7 @@ export function FileGridView({
               <div
                 className={`
                   absolute top-2 left-2 h-6 w-6 rounded-md border-2 flex items-center justify-center
-                  transition-opacity duration-150
+                  transition-all duration-150
                   ${
                     isSelecting || isSelected
                       ? "opacity-100"
@@ -110,7 +127,7 @@ export function FileGridView({
                   }
                   ${
                     isSelected
-                      ? "bg-accent-blue border-accent-blue"
+                      ? "bg-accent-blue border-accent-blue animate-selection-pulse"
                       : "bg-black/40 border-white/40 backdrop-blur-sm"
                   }
                 `}

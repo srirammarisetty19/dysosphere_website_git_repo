@@ -36,6 +36,7 @@ interface NasFilesState {
   sortBy: SortBy;
   sortOrder: SortOrder;
   typeFilter: FileTypeFilter;
+  typeFilters: Set<FileTypeFilter>;
 
   // Selection (multi-select like Google Drive)
   isSelecting: boolean;
@@ -56,6 +57,8 @@ interface NasFilesState {
   setSortBy: (sb: SortBy) => void;
   setSortOrder: (so: SortOrder) => void;
   setTypeFilter: (tf: FileTypeFilter) => void;
+  toggleTypeFilter: (tf: FileTypeFilter) => void;
+  clearTypeFilters: () => void;
 
   toggleSelection: (id: string) => void;
   selectAll: (items: DisplayItem[]) => void;
@@ -81,6 +84,7 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
   sortBy: "name",
   sortOrder: "asc",
   typeFilter: "all",
+  typeFilters: new Set<FileTypeFilter>(),
 
   isSelecting: false,
   selectedIds: new Set(),
@@ -90,6 +94,7 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
   // ── Directory Loading ───────────────────────────────────────────────
 
   loadDirectory: async (directoryId) => {
+    // Keep previous listing visible during load (prevents toolbar flash)
     set({ isLoading: true, error: null });
     try {
       const listing = await nasApiClient.listFiles(directoryId);
@@ -212,6 +217,19 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
   },
 
   setTypeFilter: (tf) => set({ typeFilter: tf }),
+
+  toggleTypeFilter: (tf) => {
+    const { typeFilters } = get();
+    const next = new Set(typeFilters);
+    if (next.has(tf)) {
+      next.delete(tf);
+    } else {
+      next.add(tf);
+    }
+    set({ typeFilters: next });
+  },
+
+  clearTypeFilters: () => set({ typeFilters: new Set() }),
 
   // ── Selection ───────────────────────────────────────────────────────
 

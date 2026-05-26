@@ -47,7 +47,7 @@ export function FileListView({
       </div>
 
       {/* File rows */}
-      {items.map((item) => {
+      {items.map((item, index) => {
         const id = item.kind === "directory" ? item.item.id : item.item.id;
         const name = item.kind === "directory" ? item.item.name : item.item.name;
         const isSelected = selectedIds.has(id);
@@ -61,13 +61,17 @@ export function FileListView({
             key={id}
             className={`
               group grid grid-cols-[1fr_120px_100px_40px] gap-4 items-center px-4 py-2.5
-              rounded-lg transition-colors cursor-pointer
+              rounded-lg transition-all duration-150 cursor-pointer
+              animate-list-row list-row-hover
               ${
                 isSelected
                   ? "bg-accent-blue/8"
-                  : "hover:bg-white/[0.03]"
+                  : index % 2 === 1
+                    ? "bg-white/[0.015] hover:bg-white/[0.04]"
+                    : "hover:bg-white/[0.03]"
               }
             `}
+            style={{ animationDelay: `${Math.min(index, 20) * 20}ms` }}
             onClick={() => {
               if (isSelecting) {
                 onToggleSelect(id);
