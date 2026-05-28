@@ -6,15 +6,16 @@
 
 import type { DisplayItem } from "@/lib/nas-types";
 import { formatBytes } from "@/lib/nas-types";
-import { X, Star, Share2, Calendar, HardDrive, FileType, MapPin } from "lucide-react";
+import { X, Star, Share2, Calendar, HardDrive, FileType, MapPin, Sparkles } from "lucide-react";
 import { FileThumbnail, FolderIcon } from "./file-thumbnail";
 
 interface FileDetailsPanelProps {
   item: DisplayItem;
   onClose: () => void;
+  onAskAI?: () => void;
 }
 
-export function FileDetailsPanel({ item, onClose }: FileDetailsPanelProps) {
+export function FileDetailsPanel({ item, onClose, onAskAI }: FileDetailsPanelProps) {
   const isFile = item.kind === "file";
   const data = item.item;
 
@@ -108,6 +109,19 @@ export function FileDetailsPanel({ item, onClose }: FileDetailsPanelProps) {
             </div>
           </div>
         </div>
+
+        {/* ── Ask AI Button (files only) ─────────────────────────── */}
+        {isFile && onAskAI && (
+          <div className="px-6 pb-4 border-b border-border-subtle">
+            <button
+              onClick={onAskAI}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-accent-blue/25 bg-accent-blue/5 text-sm font-medium text-accent-blue hover:bg-accent-blue/10 hover:border-accent-blue/40 transition-all"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Ask AI about this file</span>
+            </button>
+          </div>
+        )}
 
         {/* Details */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">

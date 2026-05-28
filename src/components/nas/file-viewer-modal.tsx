@@ -17,14 +17,16 @@ import {
   MoreVertical,
   Loader2,
   FileText,
+  Sparkles,
 } from "lucide-react";
 
 interface FileViewerModalProps {
   item: DisplayItem;
   onClose: () => void;
+  onAskAI?: () => void;
 }
 
-export function FileViewerModal({ item, onClose }: FileViewerModalProps) {
+export function FileViewerModal({ item, onClose, onAskAI }: FileViewerModalProps) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -131,6 +133,19 @@ export function FileViewerModal({ item, onClose }: FileViewerModalProps) {
         </div>
 
         <div className="flex items-center gap-1">
+          {onAskAI && (
+            <button
+              onClick={() => {
+                onClose();
+                onAskAI();
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 transition-colors text-sm font-medium"
+              title="Ask AI about this file"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Ask AI</span>
+            </button>
+          )}
           <button
             onClick={handleDownload}
             className="p-2 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors"

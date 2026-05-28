@@ -16,6 +16,7 @@ import { FileContextMenu } from "@/components/nas/file-context-menu";
 import { UploadZone } from "@/components/nas/upload-zone";
 import { FileViewerModal } from "@/components/nas/file-viewer-modal";
 import { FileDetailsPanel } from "@/components/nas/file-details-panel";
+import { FileAIChatPanel } from "@/components/nas/file-ai-chat-panel";
 import { FilterPopover } from "@/components/nas/filter-popover";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -103,6 +104,7 @@ export default function NasHomePage() {
   const [renameItem, setRenameItem] = useState<DisplayItem | null>(null);
   const [renameName, setRenameName] = useState("");
   const [colorPickerItem, setColorPickerItem] = useState<DisplayItem | null>(null);
+  const [aiChatFile, setAiChatFile] = useState<import("@/lib/nas-types").FileItem | null>(null);
 
   // ── Inline search state ──────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -731,6 +733,14 @@ export default function NasHomePage() {
           }
           onShowInfo={() => setDetailsItem(contextMenu.item)}
           onTrash={() => handleTrash(contextMenu.item)}
+          onAskAI={
+            contextMenu.item.kind === "file"
+              ? () => {
+                  setAiChatFile(contextMenu.item.item as import("@/lib/nas-types").FileItem);
+                  setContextMenu(null);
+                }
+              : undefined
+          }
         />
       )}
 
@@ -851,6 +861,14 @@ export default function NasHomePage() {
         <FileViewerModal
           item={viewerItem}
           onClose={() => setViewerItem(null)}
+          onAskAI={
+            viewerItem.kind === "file"
+              ? () => {
+                  setAiChatFile(viewerItem.item as import("@/lib/nas-types").FileItem);
+                  setViewerItem(null);
+                }
+              : undefined
+          }
         />
       )}
 
@@ -859,6 +877,22 @@ export default function NasHomePage() {
         <FileDetailsPanel
           item={detailsItem}
           onClose={() => setDetailsItem(null)}
+          onAskAI={
+            detailsItem.kind === "file"
+              ? () => {
+                  setAiChatFile(detailsItem.item as import("@/lib/nas-types").FileItem);
+                  setDetailsItem(null);
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {/* AI Chat Panel */}
+      {aiChatFile && (
+        <FileAIChatPanel
+          file={aiChatFile}
+          onClose={() => setAiChatFile(null)}
         />
       )}
     </UploadZone>

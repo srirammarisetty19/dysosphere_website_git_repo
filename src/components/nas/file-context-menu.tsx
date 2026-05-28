@@ -19,6 +19,7 @@ import {
   FolderInput,
   Copy,
   ExternalLink,
+  Sparkles,
 } from "lucide-react";
 
 interface FileContextMenuProps {
@@ -35,6 +36,7 @@ interface FileContextMenuProps {
   onShowInfo: () => void;
   onTrash: () => void;
   onCopy?: () => void;
+  onAskAI?: () => void;
 }
 
 export function FileContextMenu({
@@ -51,6 +53,7 @@ export function FileContextMenu({
   onShowInfo,
   onTrash,
   onCopy,
+  onAskAI,
 }: FileContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -90,6 +93,9 @@ export function FileContextMenu({
     },
     ...(onDownload && !isDirectory
       ? [{ icon: Download, label: "Download", action: onDownload }]
+      : []),
+    ...(onAskAI && !isDirectory
+      ? [{ icon: Sparkles, label: "✨ Ask AI", action: onAskAI, accent: true }]
       : []),
     { divider: true },
     {
@@ -144,12 +150,13 @@ export function FileContextMenu({
           );
         }
 
-        const { icon: Icon, label, action, danger } =
+        const { icon: Icon, label, action, danger, accent } =
           menuItem as {
             icon: React.ComponentType<{ className?: string }>;
             label: string;
             action: () => void;
             danger?: boolean;
+            accent?: boolean;
           };
 
         return (
@@ -164,7 +171,9 @@ export function FileContextMenu({
               ${
                 danger
                   ? "text-red-400 hover:bg-red-500/10"
-                  : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+                  : accent
+                    ? "text-accent-blue hover:bg-accent-blue/10 font-medium"
+                    : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
               }
             `}
           >
