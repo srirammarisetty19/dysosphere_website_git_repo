@@ -18,6 +18,7 @@ import { FileViewerModal } from "@/components/nas/file-viewer-modal";
 import { FileDetailsPanel } from "@/components/nas/file-details-panel";
 import { FileAIChatPanel } from "@/components/nas/file-ai-chat-panel";
 import { FilterPopover } from "@/components/nas/filter-popover";
+import { SkeletonGrid, SkeletonList } from "@/components/nas/skeleton-grid";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Grid3X3,
@@ -74,6 +75,7 @@ export default function NasHomePage() {
     typeFilters,
     isSelecting,
     selectedIds,
+    navigationDirection,
     loadDirectory,
     navigateToFolder,
     goBack,
@@ -88,6 +90,7 @@ export default function NasHomePage() {
     selectAll,
     clearSelection,
     uploadFiles,
+    prefetchDirectory,
     currentDirectoryId,
   } = useNasFilesStore();
 
@@ -583,13 +586,8 @@ export default function NasHomePage() {
           </div>
         )}
 
-        {/* Content — cross-fade via framer-motion, toolbar stays stable */}
+        {/* Content — directional slide transitions (Google Drive / Grok pattern) */}
         <div className="flex-1 overflow-y-auto relative">
-          {/* Loading overlay — shows on top of old content instead of replacing it */}
-          {isLoading && (
-            <div className="loading-overlay" />
-          )}
-
           {error ? (
             <div className="flex flex-col items-center justify-center py-20 text-red-400">
               <p className="text-sm">{error}</p>
@@ -600,14 +598,30 @@ export default function NasHomePage() {
                 Retry
               </button>
             </div>
+          ) : !listing ? (
+            /* Skeleton placeholder — shown immediately when listing is cleared on navigate */
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.1 }}
+            >
+              {viewType === "grid" ? <SkeletonGrid /> : <SkeletonList />}
+            </motion.div>
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentDirectoryId ?? "__root__"}
-                initial={{ opacity: 0, x: 20 }}
+                initial={{
+                  opacity: 0,
+                  x: navigationDirection === "forward" ? 40 : navigationDirection === "back" ? -40 : 0,
+                }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
+                exit={{
+                  opacity: 0,
+                  x: navigationDirection === "forward" ? -40 : navigationDirection === "back" ? 40 : 0,
+                }}
+                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               >
                 {viewType === "grid" ? (
                   <FileGridView
@@ -625,6 +639,7 @@ export default function NasHomePage() {
                     onLongPress={(item) => {
                       toggleSelection(item.item.id);
                     }}
+                    onPrefetchFolder={prefetchDirectory}
                   />
                 ) : (
                   <FileListView

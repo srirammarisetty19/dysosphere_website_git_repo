@@ -3,7 +3,10 @@
 // ============================================================================
 // File Grid View — Google Drive card layout
 // Uses CSS Grid auto-fill for responsive column sizing
+// Includes hover-to-prefetch for instant folder navigation
 // ============================================================================
+
+import { useRef, useCallback } from "react";
 
 import type { DisplayItem } from "@/lib/nas-types";
 import { FileThumbnail, FolderIcon } from "./file-thumbnail";
@@ -18,6 +21,7 @@ interface FileGridViewProps {
   onContextMenu: (item: DisplayItem, e: React.MouseEvent) => void;
   onToggleSelect: (id: string) => void;
   onLongPress: (item: DisplayItem) => void;
+  onPrefetchFolder?: (directoryId: string) => void;
 }
 
 export function FileGridView({
@@ -29,7 +33,28 @@ export function FileGridView({
   onContextMenu,
   onToggleSelect,
   onLongPress,
+  onPrefetchFolder,
 }: FileGridViewProps) {
+  // Hover-to-prefetch debounce timer (Google Drive pattern)
+  const prefetchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleFolderMouseEnter = useCallback(
+    (folderId: string) => {
+      if (!onPrefetchFolder) return;
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = setTimeout(() => {
+        onPrefetchFolder(folderId);
+      }, 200); // 200ms debounce — most users hover 200-500ms before clicking
+    },
+    [onPrefetchFolder]
+  );
+
+  const handleFolderMouseLeave = useCallback(() => {
+    if (prefetchTimerRef.current) {
+      clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = null;
+    }
+  }, []);
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-text-tertiary">
@@ -89,6 +114,14 @@ export function FileGridView({
               if (item.kind === "directory") onFolderTap(item);
               else onFileTap(item);
             }}
+            onMouseEnter={
+              item.kind === "directory"
+                ? () => handleFolderMouseEnter(item.item.id)
+                : undefined
+            }
+            onMouseLeave={
+              item.kind === "directory" ? handleFolderMouseLeave : undefined
+            }
           >
             {/* Thumbnail area */}
             <div className="relative aspect-[4/3] rounded-t-xl overflow-hidden">

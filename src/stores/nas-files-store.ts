@@ -23,6 +23,10 @@ interface UploadTask {
   error?: string;
 }
 
+// Prefetch cache for hover-to-prefetch (Google Drive pattern)
+const _prefetchCache = new Map<string, { data: DirectoryListing; ts: number }>();
+const PREFETCH_TTL = 15_000; // 15s — stale after this
+
 interface NasFilesState {
   // Directory browsing
   currentDirectoryId: string | null;
@@ -30,6 +34,10 @@ interface NasFilesState {
   listing: DirectoryListing | null;
   isLoading: boolean;
   error: string | null;
+
+  // Navigation direction for directional slide transitions
+  // "forward" = right-to-left, "back" = left-to-right, "none" = no animation
+  navigationDirection: "forward" | "back" | "none";
 
   // View preferences
   viewType: "grid" | "list";
@@ -52,6 +60,7 @@ interface NasFilesState {
   navigateToFolderById: (id: string, name: string) => void;
   goBack: () => void;
   goToRoot: () => void;
+  prefetchDirectory: (directoryId: string) => void;
 
   setViewType: (vt: "grid" | "list") => void;
   setSortBy: (sb: SortBy) => void;
@@ -79,6 +88,7 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
   listing: null,
   isLoading: false,
   error: null,
+  navigationDirection: "none",
 
   viewType: "grid",
   sortBy: "name",
@@ -94,10 +104,20 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
   // ── Directory Loading ───────────────────────────────────────────────
 
   loadDirectory: async (directoryId) => {
-    // Keep previous listing visible during load (prevents toolbar flash)
     set({ isLoading: true, error: null });
     try {
-      const listing = await nasApiClient.listFiles(directoryId);
+      // Check prefetch cache first (hover-to-prefetch, Google Drive pattern)
+      const cacheKey = directoryId ?? "__root__";
+      const cached = _prefetchCache.get(cacheKey);
+      let listing: DirectoryListing;
+
+      if (cached && Date.now() - cached.ts < PREFETCH_TTL) {
+        listing = cached.data;
+        _prefetchCache.delete(cacheKey);
+      } else {
+        listing = await nasApiClient.listFiles(directoryId);
+      }
+
       // Apply server preferences
       const dir = listing.directory;
       const vt = dir.view_type === "list" ? "list" : "grid";
@@ -111,6 +131,7 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
       set({
         listing,
         isLoading: false,
+        navigationDirection: "none",
         viewType: vt,
         sortBy: sb,
         sortOrder: so,
@@ -119,6 +140,7 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
     } catch (err) {
       set({
         isLoading: false,
+        navigationDirection: "none",
         error: err instanceof Error ? err.message : "Failed to load files",
       });
     }
@@ -131,9 +153,12 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
 
   navigateToFolder: (folder) => {
     const { breadcrumbs } = get();
+    // Clear listing immediately to prevent stale-data flash (Google Drive pattern)
     set({
       breadcrumbs: [...breadcrumbs, { name: folder.name, id: folder.id }],
       currentDirectoryId: folder.id,
+      listing: null,
+      navigationDirection: "forward",
       selectedIds: new Set(),
       isSelecting: false,
     });
@@ -147,6 +172,8 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
         { name, id },
       ],
       currentDirectoryId: id,
+      listing: null,
+      navigationDirection: "forward",
       selectedIds: new Set(),
       isSelecting: false,
     });
@@ -161,6 +188,8 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
     set({
       breadcrumbs: newCrumbs,
       currentDirectoryId: parentId,
+      listing: null,
+      navigationDirection: "back",
       selectedIds: new Set(),
       isSelecting: false,
     });
@@ -171,10 +200,23 @@ export const useNasFilesStore = create<NasFilesState>()((set, get) => ({
     set({
       breadcrumbs: [{ name: "My NAS", id: null }],
       currentDirectoryId: null,
+      listing: null,
+      navigationDirection: "back",
       selectedIds: new Set(),
       isSelecting: false,
     });
     get().loadDirectory(null);
+  },
+
+  // Hover-to-prefetch: load directory data on hover, cache for instant navigation
+  // Industry pattern: Google Drive, Notion, Figma all prefetch on hover
+  prefetchDirectory: (directoryId) => {
+    if (_prefetchCache.has(directoryId)) return;
+    nasApiClient.listFiles(directoryId).then((listing) => {
+      _prefetchCache.set(directoryId, { data: listing, ts: Date.now() });
+    }).catch(() => {
+      // Non-critical — prefetch failure is silent
+    });
   },
 
   // ── View Preferences ────────────────────────────────────────────────
