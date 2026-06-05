@@ -304,20 +304,25 @@ function AssistantBubble({
         {/* Inline Images */}
         {image_urls && image_urls.length > 0 && (
           <div className="flex flex-wrap gap-3 mt-3">
-            {image_urls.map((url, i) => (
+            {image_urls.map((url, i) => {
+              const resolvedUrl = apiClient.resolveFileUrl(url);
+              return (
               <a
                 key={i}
-                href={url}
+                href={resolvedUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group/img relative block rounded-xl overflow-hidden border border-white/[0.08] hover:border-white/20 transition-all shadow-lg hover:shadow-xl hover:shadow-black/20"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={url}
+                  src={resolvedUrl}
                   alt={`Generated image ${i + 1}`}
                   className="max-w-[320px] max-h-[240px] object-cover"
                   loading="lazy"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
                 />
                 {/* Hover overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end justify-end p-2">
@@ -326,7 +331,8 @@ function AssistantBubble({
                   </span>
                 </div>
               </a>
-            ))}
+              );
+            })}
           </div>
         )}
 

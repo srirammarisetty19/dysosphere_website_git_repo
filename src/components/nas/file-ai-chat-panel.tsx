@@ -35,6 +35,7 @@ import {
   MapPin,
   Search as SearchIcon,
   ScanText,
+  ExternalLink,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  imageUrls?: string[];
 }
 
 interface QuickAction {
@@ -110,15 +112,80 @@ function getQuickActions(fileType: string): QuickAction[] {
   }
 }
 
-/** Strip XML reasoning tags */
-function cleanContent(text: string): string {
-  return text
-    .replace(/<think>[\s\S]*?<\/think>/gi, "")
-    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
-    .replace(/<thought>[\s\S]*?<\/thought>/gi, "")
-    .replace(/<response>/gi, "")
-    .replace(/<\/response>/gi, "")
-    .trim();
+/**
+ * Parse structured LLM response — strip XML tags used internally.
+ * Ported from the main AI chat-store's parseStructuredContent + _parseStructuredResponse.
+ * This handles streaming content where tags may be incomplete.
+ */
+function parseStructuredContent(raw: string): string {
+  let visible = "";
+  let currentTag = "none";
+  let pos = 0;
+
+  const tags = [
+    "<reasoning>", "</reasoning>",
+    "<think>", "</think>",
+    "<thought>", "</thought>",
+    "<tool_call>", "</tool_call>",
+    "<response>", "</response>",
+  ];
+
+  while (pos < raw.length) {
+    let nextTagPos = -1;
+    let nextTag = "";
+    for (const t of tags) {
+      const i = raw.indexOf(t, pos);
+      if (i !== -1 && (nextTagPos === -1 || i < nextTagPos)) {
+        nextTagPos = i;
+        nextTag = t;
+      }
+    }
+
+    if (nextTagPos === -1) {
+      const chunk = raw.substring(pos);
+      if (
+        currentTag === "<reasoning>" ||
+        currentTag === "<think>" ||
+        currentTag === "<thought>" ||
+        currentTag === "<tool_call>"
+      ) {
+        // Inside hidden tag — discard
+      } else {
+        // Visible text — strip partial tags at the end
+        const partialMatch = chunk.match(/<\/?[a-zA-Z_]*$/);
+        visible += partialMatch ? chunk.substring(0, partialMatch.index!) : chunk;
+      }
+      break;
+    }
+
+    const chunk = raw.substring(pos, nextTagPos);
+    if (
+      currentTag === "<reasoning>" ||
+      currentTag === "<think>" ||
+      currentTag === "<thought>" ||
+      currentTag === "<tool_call>"
+    ) {
+      // Inside hidden tag — discard
+    } else if (currentTag === "none" || currentTag === "<response>") {
+      visible += chunk;
+    }
+
+    // State transition
+    currentTag = nextTag.startsWith("</") ? "none" : nextTag;
+    pos = nextTagPos + nextTag.length;
+  }
+
+  // Clean up header markers
+  let result = visible.trim();
+  result = result.replace(/## USER QUERY:\s*/gm, "");
+  result = result.replace(/^## FINAL ANSWER:?\s*/gm, "");
+  result = result.replace(/^## ASSISTANT:?\s*/gm, "");
+  return result.trim();
+}
+
+/** Strip incomplete image markdown during streaming */
+function stripIncompleteImageMarkdown(text: string): string {
+  return text.replace(/!\[[^\]]*$/, "").replace(/!\[[^\]]*\]\([^)]*$/, "");
 }
 
 // ── Component ────────────────────────────────────────────────────────────
@@ -128,9 +195,11 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [streamingImageUrls, setStreamingImageUrls] = useState<string[]>([]);
   const [currentActivity, setCurrentActivity] = useState("");
   const [showChips, setShowChips] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const rawAccumulatedRef = useRef("");
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -164,6 +233,8 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
       setIsLoading(true);
       setShowChips(false);
       setStreamingContent("");
+      setStreamingImageUrls([]);
+      rawAccumulatedRef.current = "";
       setCurrentActivity("💭 Thinking...");
 
       const controller = new AbortController();
@@ -206,7 +277,7 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let accumulated = "";
+        const currentImageUrls: string[] = [];
 
         try {
           while (true) {
@@ -227,9 +298,22 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
 
                 switch (event.type) {
                   case "token":
+                    // Accumulate raw tokens, parse to strip XML tags
+                    rawAccumulatedRef.current += event.content || "";
+                    setStreamingContent(
+                      stripIncompleteImageMarkdown(
+                        parseStructuredContent(rawAccumulatedRef.current)
+                      )
+                    );
+                    break;
                   case "thinking":
-                    accumulated += event.content || "";
-                    setStreamingContent(cleanContent(accumulated));
+                    // Thinking tokens — accumulate but parse will strip <think> tags
+                    rawAccumulatedRef.current += event.content || "";
+                    setStreamingContent(
+                      stripIncompleteImageMarkdown(
+                        parseStructuredContent(rawAccumulatedRef.current)
+                      )
+                    );
                     break;
                   case "session":
                   case "session_id":
@@ -239,6 +323,24 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
                     break;
                   case "activity":
                     setCurrentActivity(event.content || "💭 Thinking...");
+                    break;
+                  case "tool_call":
+                    // Show tool name as activity, don't dump raw content
+                    setCurrentActivity(`🔧 Running ${event.tool || "tool"}...`);
+                    break;
+                  case "step":
+                  case "tool_result":
+                    // Silently consume — don't dump into message
+                    break;
+                  case "image":
+                    // Collect image URLs for inline display
+                    if (event.image_urls) {
+                      for (const url of event.image_urls) {
+                        const s = String(url);
+                        if (!currentImageUrls.includes(s)) currentImageUrls.push(s);
+                      }
+                      setStreamingImageUrls([...currentImageUrls]);
+                    }
                     break;
                   case "error":
                     if (event.error !== "[Generation Stopped]" && event.content !== "[Generation Stopped]") {
@@ -266,8 +368,8 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
           reader.releaseLock();
         }
 
-        // Finalize
-        const finalContent = cleanContent(accumulated);
+        // Finalize — apply full parser to the raw accumulated response
+        const finalContent = parseStructuredContent(rawAccumulatedRef.current);
         if (finalContent) {
           setMessages((prev) => [
             ...prev,
@@ -275,6 +377,7 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
               role: "assistant",
               content: finalContent,
               timestamp: new Date(),
+              imageUrls: currentImageUrls.length > 0 ? [...currentImageUrls] : undefined,
             },
           ]);
         }
@@ -293,6 +396,8 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
       } finally {
         setIsLoading(false);
         setCurrentActivity("");
+        setStreamingImageUrls([]);
+        rawAccumulatedRef.current = "";
         abortControllerRef.current = null;
       }
     },
@@ -301,13 +406,21 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
 
   const stopGeneration = () => {
     abortControllerRef.current?.abort();
-    if (streamingContent) {
+    const finalContent = parseStructuredContent(rawAccumulatedRef.current);
+    if (finalContent) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: streamingContent, timestamp: new Date() },
+        {
+          role: "assistant",
+          content: finalContent,
+          timestamp: new Date(),
+          imageUrls: streamingImageUrls.length > 0 ? [...streamingImageUrls] : undefined,
+        },
       ]);
     }
     setStreamingContent("");
+    setStreamingImageUrls([]);
+    rawAccumulatedRef.current = "";
     setIsLoading(false);
     setCurrentActivity("");
   };
@@ -412,11 +525,50 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
                     }`}
                   >
                     {msg.role === "assistant" ? (
-                      <div className="gemini-prose prose prose-sm prose-invert max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {msg.content}
-                        </ReactMarkdown>
-                      </div>
+                      <>
+                        <div className="gemini-prose prose prose-sm prose-invert max-w-none">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {msg.content}
+                          </ReactMarkdown>
+                        </div>
+                        {/* Inline image thumbnails from NAS */}
+                        {msg.imageUrls && msg.imageUrls.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {msg.imageUrls.map((url, i) => {
+                              // Resolve relative URLs through the AI server
+                              const { activeAccount } = useAuthStore.getState();
+                              const resolvedUrl = url.startsWith("/")
+                                ? `${activeAccount?.serverUrl}/api/ai${url}`
+                                : url;
+                              return (
+                                <a
+                                  key={i}
+                                  href={resolvedUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="group/img relative block rounded-xl overflow-hidden border border-white/[0.08] hover:border-white/20 transition-all"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={resolvedUrl}
+                                    alt={`NAS image ${i + 1}`}
+                                    className="max-w-[200px] max-h-[160px] object-cover"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = "none";
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end justify-end p-1.5">
+                                    <span className="flex items-center gap-1 text-[9px] text-white/80 bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-md">
+                                      <ExternalLink size={8} /> Open
+                                    </span>
+                                  </div>
+                                </a>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <p className="whitespace-pre-wrap">{msg.content}</p>
                     )}

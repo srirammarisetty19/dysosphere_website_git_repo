@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { useState, type ComponentPropsWithoutRef } from "react";
 import { Check, Copy } from "lucide-react";
+import { apiClient } from "@/lib/api-client";
 
 // Import highlight.js atom-one-dark theme
 import "highlight.js/styles/atom-one-dark.css";
@@ -197,18 +198,24 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
           ),
 
           // ── Images ───────────────────────────────────────────────
-          img: ({ src, alt, ...props }) => (
+          img: ({ src, alt, ...props }) => {
+            const resolvedSrc = src ? apiClient.resolveFileUrl(String(src)) : "";
+            return (
             <span className="block my-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={src}
+                src={resolvedSrc}
                 alt={alt || ""}
                 className="rounded-xl max-w-full border border-white/[0.08] shadow-lg"
                 loading="lazy"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
                 {...props}
               />
             </span>
-          ),
+            );
+          },
         }}
       >
         {content}
