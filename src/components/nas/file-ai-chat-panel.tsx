@@ -524,7 +524,7 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
               {messages.map((msg, idx) => (
                 <div
                   key={idx}
-                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`group flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   style={{ animation: "message-in 0.2s ease-out" }}
                 >
                   <div
@@ -578,18 +578,24 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
                             })}
                           </div>
                         )}
-                        {/* ── Action Row (Copy, Retry, Read Aloud) ── */}
+                        {/* ── Action Row (Copy, Read Aloud) ── */}
                         <NasChatActionRow
                           content={msg.content}
-                          messageIndex={idx}
-                          messages={messages}
-                          onRetry={(userText) => sendMessage(userText)}
                         />
                       </>
                     ) : (
                       <p className="whitespace-pre-wrap">{msg.content}</p>
                     )}
                   </div>
+                  {/* ── User Actions: Copy + Retry (below message) ── */}
+                  {msg.role === "user" && (
+                    <NasUserActionRow
+                      content={msg.content}
+                      messageIndex={idx}
+                      messages={messages}
+                      onRetry={(userText) => sendMessage(userText)}
+                    />
+                  )}
                 </div>
               ))}
 
@@ -679,14 +685,8 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
 // Compact action buttons for assistant messages: Copy, Retry, Read Aloud
 function NasChatActionRow({
   content,
-  messageIndex,
-  messages,
-  onRetry,
 }: {
   content: string;
-  messageIndex: number;
-  messages: ChatMessage[];
-  onRetry: (userText: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -695,7 +695,6 @@ function NasChatActionRow({
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(content).catch(() => {});
     } else {
-      // Fallback
       const ta = document.createElement("textarea");
       ta.value = content;
       ta.style.position = "fixed";
@@ -707,16 +706,6 @@ function NasChatActionRow({
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleRetry = () => {
-    // Find the preceding user message
-    for (let i = messageIndex - 1; i >= 0; i--) {
-      if (messages[i].role === "user") {
-        onRetry(messages[i].content);
-        return;
-      }
-    }
   };
 
   const handleReadAloud = () => {
@@ -752,15 +741,6 @@ function NasChatActionRow({
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>
 
-      {/* Retry */}
-      <button
-        onClick={handleRetry}
-        className="p-1 rounded-md text-text-tertiary hover:text-text-secondary hover:bg-white/5 transition-all duration-200"
-        title="Retry"
-      >
-        <RefreshCw size={13} />
-      </button>
-
       {/* Read Aloud */}
       {typeof window !== "undefined" && window.speechSynthesis && (
         <button
@@ -775,6 +755,65 @@ function NasChatActionRow({
           {isSpeaking ? <VolumeX size={13} /> : <Volume2 size={13} />}
         </button>
       )}
+    </div>
+  );
+}
+
+/** User message actions: Copy + Retry (below user message) */
+function NasUserActionRow({
+  content,
+  messageIndex,
+  messages,
+  onRetry,
+}: {
+  content: string;
+  messageIndex: number;
+  messages: ChatMessage[];
+  onRetry: (userText: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(content).catch(() => {});
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = content;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRetry = () => {
+    onRetry(content);
+  };
+
+  return (
+    <div className="flex items-center gap-0.5 mt-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+      <button
+        onClick={handleCopy}
+        className={`p-1 rounded-md transition-all duration-200 ${
+          copied
+            ? "text-green-400"
+            : "text-text-tertiary hover:text-text-secondary hover:bg-white/5"
+        }`}
+        title={copied ? "Copied!" : "Copy"}
+      >
+        {copied ? <Check size={13} /> : <Copy size={13} />}
+      </button>
+      <button
+        onClick={handleRetry}
+        className="p-1 rounded-md text-text-tertiary hover:text-text-secondary hover:bg-white/5 transition-all duration-200"
+        title="Retry"
+      >
+        <RefreshCw size={13} />
+      </button>
     </div>
   );
 }

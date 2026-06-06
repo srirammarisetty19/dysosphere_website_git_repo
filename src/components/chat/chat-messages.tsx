@@ -49,7 +49,7 @@ export function ChatMessages({
         const isStreamingAssistant = isLast && isLoading && msg.role === "assistant";
 
         if (msg.role === "user") {
-          return <UserBubble key={index} content={msg.content} imageUrls={msg.image_urls} parts={msg.parts} timestamp={msg.created_at} />;
+          return <UserBubble key={index} content={msg.content} imageUrls={msg.image_urls} parts={msg.parts} timestamp={msg.created_at} messageIndex={index} />;
         }
 
         if (msg.role === "assistant") {
@@ -305,7 +305,7 @@ function ThumbsButton({
 }
 
 // ── User Bubble ─────────────────────────────────────────────────────────
-function UserBubble({ content, imageUrls, parts, timestamp }: { content: string; imageUrls?: string[]; parts?: MessagePart[]; timestamp?: string }) {
+function UserBubble({ content, imageUrls, parts, timestamp, messageIndex }: { content: string; imageUrls?: string[]; parts?: MessagePart[]; timestamp?: string; messageIndex: number }) {
   const hasParts = parts && parts.length > 0;
   const imageParts = hasParts ? parts.filter((p) => p.type === 'image' && p.file_url) : [];
   const hasPartsImages = imageParts.length > 0;
@@ -331,11 +331,6 @@ function UserBubble({ content, imageUrls, parts, timestamp }: { content: string;
 
   return (
     <div className="group flex gap-3 py-5 justify-end">
-      {/* Hover actions */}
-      <div className="flex items-start pt-1 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <CopyButton text={content} />
-      </div>
-
       {/* Bubble */}
       <div className="max-w-[80%] lg:max-w-[70%]">
         {/* Multimodal parts images (industry standard) */}
@@ -397,12 +392,17 @@ function UserBubble({ content, imageUrls, parts, timestamp }: { content: string;
             </p>
           </div>
         )}
-        {/* Timestamp */}
-        {timestamp && (
-          <p className="text-right text-white/0 group-hover:text-white/20 text-[10px] mt-1 mr-2 transition-colors">
-            {formatTimestamp(timestamp)}
-          </p>
-        )}
+        {/* ── User Actions: Copy + Retry (below message, right-aligned) ── */}
+        <div className="flex items-center gap-0.5 mt-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+          <CopyButton text={displayContent || content} />
+          <RetryButton messageIndex={messageIndex} />
+          {/* Timestamp */}
+          {timestamp && (
+            <span className="text-white/20 text-[10px] ml-2">
+              {formatTimestamp(timestamp)}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Avatar */}
@@ -547,7 +547,6 @@ function AssistantBubble({
           <div className="flex items-center gap-0.5 mt-1">
             {/* Left group: utility actions */}
             <CopyButton text={finalResponse} />
-            <RetryButton messageIndex={messageIndex} />
             <ReadAloudButton text={finalResponse} />
             <ShareButton text={finalResponse} />
 
