@@ -36,6 +36,11 @@ import {
   Search as SearchIcon,
   ScanText,
   ExternalLink,
+  Copy,
+  Check,
+  RefreshCw,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -180,6 +185,8 @@ function parseStructuredContent(raw: string): string {
   result = result.replace(/## USER QUERY:\s*/gm, "");
   result = result.replace(/^## FINAL ANSWER:?\s*/gm, "");
   result = result.replace(/^## ASSISTANT:?\s*/gm, "");
+  // Strip leading blank lines that appear before the actual response
+  result = result.replace(/^\s*\n+/, "");
   return result.trim();
 }
 
@@ -300,6 +307,9 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
                   case "token":
                     // Accumulate raw tokens, parse to strip XML tags
                     rawAccumulatedRef.current += event.content || "";
+                    // Clear activity label once real content starts flowing
+                    // (prevents stale tool status from persisting)
+                    setCurrentActivity("");
                     setStreamingContent(
                       stripIncompleteImageMarkdown(
                         parseStructuredContent(rawAccumulatedRef.current)
@@ -568,6 +578,13 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
                             })}
                           </div>
                         )}
+                        {/* ── Action Row (Copy, Retry, Read Aloud) ── */}
+                        <NasChatActionRow
+                          content={msg.content}
+                          messageIndex={idx}
+                          messages={messages}
+                          onRetry={(userText) => sendMessage(userText)}
+                        />
                       </>
                     ) : (
                       <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -657,3 +674,108 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
     </div>
   );
 }
+
+// ── NAS Chat Action Row ─────────────────────────────────────────────────
+// Compact action buttons for assistant messages: Copy, Retry, Read Aloud
+function NasChatActionRow({
+  content,
+  messageIndex,
+  messages,
+  onRetry,
+}: {
+  content: string;
+  messageIndex: number;
+  messages: ChatMessage[];
+  onRetry: (userText: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const handleCopy = () => {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(content).catch(() => {});
+    } else {
+      // Fallback
+      const ta = document.createElement("textarea");
+      ta.value = content;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRetry = () => {
+    // Find the preceding user message
+    for (let i = messageIndex - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        onRetry(messages[i].content);
+        return;
+      }
+    }
+  };
+
+  const handleReadAloud = () => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(content);
+    utterance.rate = 1.0;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  return (
+    <div className="flex items-center gap-0.5 mt-2 -mb-1">
+      {/* Copy */}
+      <button
+        onClick={handleCopy}
+        className={`p-1 rounded-md transition-all duration-200 ${
+          copied
+            ? "text-green-400"
+            : "text-text-tertiary hover:text-text-secondary hover:bg-white/5"
+        }`}
+        title={copied ? "Copied!" : "Copy"}
+      >
+        {copied ? <Check size={13} /> : <Copy size={13} />}
+      </button>
+
+      {/* Retry */}
+      <button
+        onClick={handleRetry}
+        className="p-1 rounded-md text-text-tertiary hover:text-text-secondary hover:bg-white/5 transition-all duration-200"
+        title="Retry"
+      >
+        <RefreshCw size={13} />
+      </button>
+
+      {/* Read Aloud */}
+      {typeof window !== "undefined" && window.speechSynthesis && (
+        <button
+          onClick={handleReadAloud}
+          className={`p-1 rounded-md transition-all duration-200 ${
+            isSpeaking
+              ? "text-accent-blue bg-accent-blue/10"
+              : "text-text-tertiary hover:text-text-secondary hover:bg-white/5"
+          }`}
+          title={isSpeaking ? "Stop reading" : "Read aloud"}
+        >
+          {isSpeaking ? <VolumeX size={13} /> : <Volume2 size={13} />}
+        </button>
+      )}
+    </div>
+  );
+}
+

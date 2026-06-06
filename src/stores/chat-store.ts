@@ -49,6 +49,7 @@ interface ChatState {
   togglePin: (conversationId: string, isPinned: boolean) => void;
   loadConversations: () => Promise<void>;
   clearError: () => void;
+  retryMessage: (assistantMessageIndex: number) => void;
 }
 
 // ── Structured Response Parser ────────────────────────────────────────
@@ -763,6 +764,30 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   clearError: () => set({ errorMessage: null }),
+
+  retryMessage: (assistantMessageIndex: number) => {
+    const { messages, isLoading, sendMessage } = get();
+    if (isLoading) return; // Don't retry while streaming
+    if (assistantMessageIndex < 0 || assistantMessageIndex >= messages.length) return;
+
+    // Find the preceding user message
+    let userIndex = -1;
+    for (let i = assistantMessageIndex - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        userIndex = i;
+        break;
+      }
+    }
+    if (userIndex < 0) return;
+
+    const userText = messages[userIndex].content;
+
+    // Truncate: keep everything before the user message being retried
+    set({ messages: messages.slice(0, userIndex) });
+
+    // Re-send the original user message
+    sendMessage(userText);
+  },
 }));
 
 // ── Role Normalization ────────────────────────────────────────────────

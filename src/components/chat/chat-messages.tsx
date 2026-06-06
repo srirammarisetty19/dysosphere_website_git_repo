@@ -3,15 +3,31 @@
 // ============================================================================
 // Chat Messages — Message list with thinking blocks, markdown, and attachments
 // Enhanced for web: copy-to-clipboard, timestamps, hover actions, avatar
+// Industry-standard action bar: Copy, Retry, Read Aloud, Share, Thumbs Up/Down
 // ============================================================================
 
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { Message, MessagePart } from "@/lib/types";
 import { ThinkingBlock } from "@/components/chat/thinking-block";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
-import { Copy, Check, User, Sparkles, ExternalLink, Download, ImageIcon } from "lucide-react";
+import {
+  Copy,
+  Check,
+  User,
+  Sparkles,
+  ExternalLink,
+  Download,
+  ImageIcon,
+  RefreshCw,
+  Volume2,
+  VolumeX,
+  Share2,
+  ThumbsUp,
+  ThumbsDown,
+} from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { useChatStore } from "@/stores/chat-store";
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -41,6 +57,7 @@ export function ChatMessages({
             <AssistantBubble
               key={index}
               message={msg}
+              messageIndex={index}
               isStreaming={isStreamingAssistant}
               currentActivity={isStreamingAssistant ? currentActivity : null}
               iterationSummaries={isStreamingAssistant ? iterationSummaries : msg.steps.length > 0 ? [] : []}
@@ -96,6 +113,27 @@ function copyToClipboard(text: string): boolean {
   }
 }
 
+// ── Feedback persistence (localStorage) ─────────────────────────────────
+function getFeedback(messageIndex: number, conversationId: string | null): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const key = `feedback:${conversationId ?? "temp"}:${messageIndex}`;
+    return localStorage.getItem(key);
+  } catch { return null; }
+}
+
+function setFeedback(messageIndex: number, conversationId: string | null, rating: string): string | null {
+  if (typeof window === "undefined") return null;
+  const key = `feedback:${conversationId ?? "temp"}:${messageIndex}`;
+  const current = localStorage.getItem(key);
+  if (current === rating) {
+    localStorage.removeItem(key);
+    return null;
+  }
+  localStorage.setItem(key, rating);
+  return rating;
+}
+
 // ── Copy Button ─────────────────────────────────────────────────────────
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -114,11 +152,154 @@ function CopyButton({ text }: { text: string }) {
       className={`p-1.5 rounded-lg transition-all duration-200 ${
         copied
           ? "text-green-400 bg-green-400/10"
-          : "text-white/0 group-hover:text-white/30 hover:!text-white/60 hover:bg-white/5"
+          : "text-white/30 hover:text-white/60 hover:bg-white/5"
       }`}
       title={copied ? "Copied!" : "Copy message"}
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}
+    </button>
+  );
+}
+
+// ── Retry Button ────────────────────────────────────────────────────────
+function RetryButton({ messageIndex }: { messageIndex: number }) {
+  const retryMessage = useChatStore((s) => s.retryMessage);
+  const isLoading = useChatStore((s) => s.isLoading);
+
+  return (
+    <button
+      onClick={() => retryMessage(messageIndex)}
+      disabled={isLoading}
+      className="p-1.5 rounded-lg transition-all duration-200 text-white/30 hover:text-white/60 hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
+      title="Retry"
+    >
+      <RefreshCw size={14} />
+    </button>
+  );
+}
+
+// ── Read Aloud Button ───────────────────────────────────────────────────
+function ReadAloudButton({ text }: { text: string }) {
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleToggle = useCallback(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    // Stop any existing speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    utteranceRef.current = utterance;
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  }, [text, isSpeaking]);
+
+  // Don't render if Speech API not available
+  if (typeof window === "undefined" || !window.speechSynthesis) return null;
+
+  return (
+    <button
+      onClick={handleToggle}
+      className={`p-1.5 rounded-lg transition-all duration-200 ${
+        isSpeaking
+          ? "text-[var(--color-accent-cyan)] bg-[var(--color-accent-cyan)]/10"
+          : "text-white/30 hover:text-white/60 hover:bg-white/5"
+      }`}
+      title={isSpeaking ? "Stop reading" : "Read aloud"}
+    >
+      {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
+    </button>
+  );
+}
+
+// ── Share Button ────────────────────────────────────────────────────────
+function ShareButton({ text }: { text: string }) {
+  const [shared, setShared] = useState(false);
+
+  const handleShare = async () => {
+    // Try native share API first (mobile browsers)
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch {
+        // User cancelled or not supported — fall through to copy
+      }
+    }
+    // Fallback: copy to clipboard
+    const ok = copyToClipboard(text);
+    if (ok) {
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleShare}
+      className={`p-1.5 rounded-lg transition-all duration-200 ${
+        shared
+          ? "text-green-400 bg-green-400/10"
+          : "text-white/30 hover:text-white/60 hover:bg-white/5"
+      }`}
+      title="Share"
+    >
+      {shared ? <Check size={14} /> : <Share2 size={14} />}
+    </button>
+  );
+}
+
+// ── Thumbs Feedback Button ──────────────────────────────────────────────
+function ThumbsButton({
+  messageIndex,
+  direction,
+}: {
+  messageIndex: number;
+  direction: "up" | "down";
+}) {
+  const conversationId = useChatStore((s) => s.conversationId);
+  const [rating, setRating] = useState<string | null>(() =>
+    getFeedback(messageIndex, conversationId)
+  );
+
+  const isActive = rating === direction;
+  const Icon = direction === "up" ? ThumbsUp : ThumbsDown;
+
+  const handleClick = () => {
+    const newRating = setFeedback(messageIndex, conversationId, direction);
+    setRating(newRating);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`p-1.5 rounded-lg transition-all duration-200 ${
+        isActive
+          ? "text-[var(--color-accent-cyan)] bg-[var(--color-accent-cyan)]/10"
+          : "text-white/30 hover:text-white/60 hover:bg-white/5"
+      }`}
+      title={direction === "up" ? "Good response" : "Bad response"}
+    >
+      <Icon size={14} fill={isActive ? "currentColor" : "none"} />
     </button>
   );
 }
@@ -235,11 +416,13 @@ function UserBubble({ content, imageUrls, parts, timestamp }: { content: string;
 // ── Assistant Bubble ────────────────────────────────────────────────────
 function AssistantBubble({
   message,
+  messageIndex,
   isStreaming,
   currentActivity,
   iterationSummaries,
 }: {
   message: Message;
+  messageIndex: number;
   isStreaming: boolean;
   currentActivity: string | null;
   iterationSummaries: string[];
@@ -358,13 +541,26 @@ function AssistantBubble({
           </div>
         )}
 
-        {/* Hover actions row */}
+        {/* ── Industry-Standard Action Row ─────────────────────────────── */}
+        {/* Copy | Retry | Read Aloud | Share | 👍 | 👎                    */}
         {finalResponse && !isStreaming && (
-          <div className="flex items-center gap-0.5 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-0.5 mt-1">
+            {/* Left group: utility actions */}
             <CopyButton text={finalResponse} />
+            <RetryButton messageIndex={messageIndex} />
+            <ReadAloudButton text={finalResponse} />
+            <ShareButton text={finalResponse} />
+
+            {/* Divider */}
+            <div className="w-px h-3.5 bg-white/[0.08] mx-1" />
+
+            {/* Right group: feedback */}
+            <ThumbsButton messageIndex={messageIndex} direction="up" />
+            <ThumbsButton messageIndex={messageIndex} direction="down" />
+
             {/* Timestamp */}
             {message.created_at && (
-              <span className="text-white/20 text-[10px] ml-1">
+              <span className="text-white/20 text-[10px] ml-2">
                 {formatTimestamp(message.created_at)}
               </span>
             )}
