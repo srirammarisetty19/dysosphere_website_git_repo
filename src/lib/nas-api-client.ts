@@ -303,7 +303,14 @@ class NasApiClient {
   async searchFiles(
     query: string
   ): Promise<Array<Record<string, unknown>>> {
-    return this.request(`/api/nas-files/search?q=${encodeURIComponent(query)}`);
+    // Server returns FileSearchResponse { files, directories, total_results }
+    // — flatten into a single array for consumer compatibility
+    const data = await this.request<{
+      files: Array<Record<string, unknown>>;
+      directories: Array<Record<string, unknown>>;
+      total_results: number;
+    }>(`/api/nas-files/search?q=${encodeURIComponent(query)}`);
+    return [...(data.directories || []), ...(data.files || [])];
   }
 
   async searchSemantic(

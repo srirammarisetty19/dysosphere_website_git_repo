@@ -19,6 +19,7 @@ import {
   Filter,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { AuthImage } from "@/components/ui/auth-image";
 
 interface ArtifactFile {
   id: string;
@@ -32,70 +33,7 @@ interface ArtifactFile {
   stored_path: string;
 }
 
-// ── Authenticated Image Component ─────────────────────────────────────
-// <img> tags can't send Authorization headers, so we fetch the image
-// with auth, create a blob URL, and render that instead.
-function AuthImage({
-  storedPath,
-  alt,
-  className,
-}: {
-  storedPath: string;
-  alt: string;
-  className?: string;
-}) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [error, setError] = useState(false);
-  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    let objectUrl: string | null = null;
-
-    apiClient
-      .fetchAuthenticatedBlob(storedPath)
-      .then((url) => {
-        if (mountedRef.current) {
-          objectUrl = url;
-          setBlobUrl(url);
-        }
-      })
-      .catch(() => {
-        if (mountedRef.current) setError(true);
-      });
-
-    return () => {
-      mountedRef.current = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [storedPath]);
-
-  if (error) {
-    return (
-      <div className={`flex items-center justify-center bg-white/[0.02] ${className}`}>
-        <ImageIcon size={24} className="text-white/10" />
-      </div>
-    );
-  }
-
-  if (!blobUrl) {
-    return (
-      <div className={`flex items-center justify-center bg-white/[0.02] ${className}`}>
-        <Loader2 size={20} className="animate-spin text-white/10" />
-      </div>
-    );
-  }
-
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={blobUrl}
-      alt={alt}
-      className={className}
-      loading="lazy"
-    />
-  );
-}
 
 export default function ArtifactsPage() {
   const [files, setFiles] = useState<ArtifactFile[]>([]);
@@ -283,9 +221,10 @@ export default function ArtifactsPage() {
                       onClick={() => handleDownload(file)}
                     >
                       <AuthImage
-                        storedPath={file.stored_path}
+                        src={file.stored_path}
                         alt={file.name}
                         className="w-full h-full object-contain"
+                        clickToOpen
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>

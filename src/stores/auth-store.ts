@@ -77,6 +77,9 @@ export const useAuthStore = create<AuthState>()(
             accounts: updatedAccounts,
             isLoading: false,
           });
+
+          // Start the background refresh timer now that we have a valid token
+          apiClient.scheduleTokenRefresh();
         } catch (err) {
           set({
             isLoading: false,
@@ -114,6 +117,9 @@ export const useAuthStore = create<AuthState>()(
             accounts: updatedAccounts,
             isLoading: false,
           });
+
+          // Start the background refresh timer
+          apiClient.scheduleTokenRefresh();
         } catch (err) {
           set({
             isLoading: false,
@@ -130,6 +136,9 @@ export const useAuthStore = create<AuthState>()(
           // Server logout failed — still clear local state
         }
 
+        // Stop the background refresh timer
+        apiClient.cancelTokenRefreshTimer();
+
         const { accounts, activeAccount } = get();
         const remaining = accounts.filter(
           (a) => a.id !== activeAccount?.id
@@ -145,6 +154,8 @@ export const useAuthStore = create<AuthState>()(
             accounts: remaining,
             user: { id: "cached", username: next.username, email: next.email },
           });
+          // Restart the timer for the newly active account
+          apiClient.scheduleTokenRefresh();
         } else {
           set({
             user: null,
@@ -166,6 +177,8 @@ export const useAuthStore = create<AuthState>()(
             // Best-effort
           }
         }
+        // Stop the background refresh timer
+        apiClient.cancelTokenRefreshTimer();
         set({
           user: null,
           activeAccount: null,
@@ -234,6 +247,8 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () => {
         apiClient.setToken(null);
         apiClient.setServerUrl(null);
+        // Stop the background refresh timer
+        apiClient.cancelTokenRefreshTimer();
         set({
           user: null,
           activeAccount: null,
@@ -273,6 +288,12 @@ export const useAuthStore = create<AuthState>()(
         // We set it regardless of errors so the UI never stays frozen.
         queueMicrotask(() => {
           useAuthStore.setState({ _hasHydrated: true });
+          // Start proactive token refresh now that we have the token from storage.
+          // This is exactly what Google does on page load: check JWT exp and
+          // schedule a silent refresh before it expires.
+          if (state?.activeAccount?.token) {
+            apiClient.scheduleTokenRefresh();
+          }
         });
         void error; // suppress unused-var lint
       },

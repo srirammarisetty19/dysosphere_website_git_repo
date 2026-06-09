@@ -11,6 +11,7 @@ import type { Message, MessagePart } from "@/lib/types";
 import { ThinkingBlock } from "@/components/chat/thinking-block";
 import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { TypingIndicator } from "@/components/chat/typing-indicator";
+import { AuthImage } from "@/components/ui/auth-image";
 import {
   Copy,
   Check,
@@ -25,9 +26,27 @@ import {
   Share2,
   ThumbsUp,
   ThumbsDown,
+  Paperclip,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { useChatStore } from "@/stores/chat-store";
+
+// ── Classify current session (NAS InPlace AI detection) ─────────────────
+function useNasContext(): { isNasInplace: boolean; filename: string | null } {
+  const { conversations, conversationId } = useChatStore();
+  if (!conversationId) return { isNasInplace: false, filename: null };
+  const convo = conversations.find((c) => c.id === conversationId);
+  if (!convo) return { isNasInplace: false, filename: null };
+  // Structured metadata (preferred)
+  if (convo.metadata?.context_type === "nas_inplace") {
+    return { isNasInplace: true, filename: convo.metadata?.source_file?.filename ?? null };
+  }
+  // Emoji prefix fallback (backward compat with existing sessions)
+  if (convo.title?.startsWith("📎")) {
+    return { isNasInplace: true, filename: convo.title.slice(2).trim() || null };
+  }
+  return { isNasInplace: false, filename: null };
+}
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -42,6 +61,10 @@ export function ChatMessages({
   currentActivity,
   iterationSummaries,
 }: ChatMessagesProps) {
+  const { isNasInplace, filename: nasFilename } = useNasContext();
+  // File reference chip shown only on the FIRST user message (industry standard)
+  const firstUserMsgIndex = messages.findIndex((m) => m.role === "user");
+
   return (
     <div className="px-4 md:px-6 lg:px-8 xl:px-0 xl:max-w-3xl xl:mx-auto py-6 space-y-1">
       {messages.map((msg, index) => {
@@ -49,7 +72,17 @@ export function ChatMessages({
         const isStreamingAssistant = isLast && isLoading && msg.role === "assistant";
 
         if (msg.role === "user") {
-          return <UserBubble key={index} content={msg.content} imageUrls={msg.image_urls} parts={msg.parts} timestamp={msg.created_at} messageIndex={index} />;
+          return (
+            <UserBubble
+              key={index}
+              content={msg.content}
+              imageUrls={msg.image_urls}
+              parts={msg.parts}
+              timestamp={msg.created_at}
+              messageIndex={index}
+              nasFilename={isNasInplace && index === firstUserMsgIndex ? nasFilename : null}
+            />
+          );
         }
 
         if (msg.role === "assistant") {
@@ -305,7 +338,21 @@ function ThumbsButton({
 }
 
 // ── User Bubble ─────────────────────────────────────────────────────────
-function UserBubble({ content, imageUrls, parts, timestamp, messageIndex }: { content: string; imageUrls?: string[]; parts?: MessagePart[]; timestamp?: string; messageIndex: number }) {
+function UserBubble({
+  content,
+  imageUrls,
+  parts,
+  timestamp,
+  messageIndex,
+  nasFilename,
+}: {
+  content: string;
+  imageUrls?: string[];
+  parts?: MessagePart[];
+  timestamp?: string;
+  messageIndex: number;
+  nasFilename?: string | null;
+}) {
   const hasParts = parts && parts.length > 0;
   const imageParts = hasParts ? parts.filter((p) => p.type === 'image' && p.file_url) : [];
   const hasPartsImages = imageParts.length > 0;
@@ -333,55 +380,52 @@ function UserBubble({ content, imageUrls, parts, timestamp, messageIndex }: { co
     <div className="group flex gap-3 py-5 justify-end">
       {/* Bubble */}
       <div className="max-w-[80%] lg:max-w-[70%]">
-        {/* Multimodal parts images (industry standard) */}
+        {/* ── NAS InPlace AI File Reference Chip (first user message only) ── */}
+        {/* Industry pattern: Google Photos Ask / Samsung Galaxy AI surface   */}
+        {/* the file context on the question side for grounding clarity.      */}
+        {nasFilename && (
+          <div className="flex justify-end mb-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--color-accent-blue)]/10 border border-[var(--color-accent-blue)]/20">
+              <Paperclip size={10} className="text-[var(--color-accent-blue)]/60 shrink-0" />
+              <span className="text-[11px] text-[var(--color-accent-blue)]/70 font-medium truncate max-w-[220px]">
+                {nasFilename}
+              </span>
+            </div>
+          </div>
+        )}
+        {/* Multimodal parts images (AuthImage for authenticated fetch) */}
         {hasPartsImages && (
           <div className="flex flex-wrap gap-2 mb-2 justify-end">
             {imageParts.map((part, i) => (
-              <a
+              <div
                 key={i}
-                href={apiClient.resolveFileUrl(part.file_url!)}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="group/img relative block rounded-xl overflow-hidden border border-white/[0.08] hover:border-white/20 transition-all"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={apiClient.resolveFileUrl(part.file_url!)}
+                <AuthImage
+                  src={part.file_url!}
                   alt={part.filename || `Uploaded image ${i + 1}`}
                   className="max-w-[200px] max-h-[200px] object-cover rounded-xl"
-                  loading="lazy"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
+                  clickToOpen
                 />
-              </a>
+              </div>
             ))}
           </div>
         )}
-        {/* Legacy images (backward compat for old messages) */}
+        {/* Legacy images (AuthImage for authenticated fetch) */}
         {hasLegacyImages && (
           <div className="flex flex-wrap gap-2 mb-2 justify-end">
             {imageUrls!.map((url, i) => (
-              <a
+              <div
                 key={i}
-                href={apiClient.resolveFileUrl(url)}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="group/img relative block rounded-xl overflow-hidden border border-white/[0.08] hover:border-white/20 transition-all"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={apiClient.resolveFileUrl(url)}
+                <AuthImage
+                  src={url}
                   alt={`Uploaded image ${i + 1}`}
                   className="max-w-[200px] max-h-[200px] object-cover rounded-xl"
-                  loading="lazy"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
+                  clickToOpen
                 />
-              </a>
+              </div>
             ))}
           </div>
         )}
@@ -484,38 +528,28 @@ function AssistantBubble({
           </div>
         )}
 
-        {/* Inline Images */}
+        {/* Inline Images (AuthImage for authenticated fetch) */}
         {image_urls && image_urls.length > 0 && (
           <div className="flex flex-wrap gap-3 mt-3">
-            {image_urls.map((url, i) => {
-              const resolvedUrl = apiClient.resolveFileUrl(url);
-              return (
-              <a
+            {image_urls.map((url, i) => (
+              <div
                 key={i}
-                href={resolvedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="group/img relative block rounded-xl overflow-hidden border border-white/[0.08] hover:border-white/20 transition-all shadow-lg hover:shadow-xl hover:shadow-black/20"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={resolvedUrl}
+                <AuthImage
+                  src={url}
                   alt={`Generated image ${i + 1}`}
                   className="max-w-[320px] max-h-[240px] object-cover"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
+                  clickToOpen
                 />
                 {/* Hover overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end justify-end p-2">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end justify-end p-2 pointer-events-none">
                   <span className="flex items-center gap-1 text-[10px] text-white/80 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-lg">
                     <ExternalLink size={10} /> Open
                   </span>
                 </div>
-              </a>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
 
@@ -541,21 +575,11 @@ function AssistantBubble({
           </div>
         )}
 
-        {/* ── Industry-Standard Action Row ─────────────────────────────── */}
-        {/* Copy | Retry | Read Aloud | Share | 👍 | 👎                    */}
+        {/* ── Action Row: Copy | Read Aloud ───────────────────────────── */}
         {finalResponse && !isStreaming && (
           <div className="flex items-center gap-0.5 mt-1">
-            {/* Left group: utility actions */}
             <CopyButton text={finalResponse} />
             <ReadAloudButton text={finalResponse} />
-            <ShareButton text={finalResponse} />
-
-            {/* Divider */}
-            <div className="w-px h-3.5 bg-white/[0.08] mx-1" />
-
-            {/* Right group: feedback */}
-            <ThumbsButton messageIndex={messageIndex} direction="up" />
-            <ThumbsButton messageIndex={messageIndex} direction="down" />
 
             {/* Timestamp */}
             {message.created_at && (

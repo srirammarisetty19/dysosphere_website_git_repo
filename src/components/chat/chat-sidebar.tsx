@@ -1,9 +1,16 @@
 "use client";
 
 // ============================================================================
-// Chat Sidebar — Conversation list with search, pinning, and navigation
-// Port of _buildDrawer from home_screen.dart
-// Persistent on desktop (lg+), slide-out drawer on mobile
+// Chat Sidebar — Conversation list with sectioned categorization
+//
+// Sections (industry pattern — Google Gemini / ChatGPT sidebar):
+//   • Pinned            — user-pinned conversations (always shown at top)
+//   • NAS InPlace AI    — file-scoped "Ask AI" chats (📎 prefix)
+//   • Reminders         — scheduler/heartbeat-triggered chats (⏰ prefix)
+//   • Regular Chats     — everything else
+//
+// Sections are collapsible (default: NAS & Reminders collapsed, Regular open).
+// File reference displayed as subtitle on NAS InPlace AI tiles.
 // ============================================================================
 
 import { useState, useEffect } from "react";
@@ -19,9 +26,183 @@ import {
   Calendar,
   Settings,
   Clock,
+  Paperclip,
+  AlarmClock,
+  ChevronRight,
+  ChevronDown,
+  MessagesSquare,
 } from "lucide-react";
 import { useChatStore } from "@/stores/chat-store";
 import { DSLogo } from "@/components/ui/ds-logo";
+import type { Conversation } from "@/lib/types";
+
+// ── Conversation Classifier ─────────────────────────────────────────────────
+
+type ConversationCategory = "nas_inplace" | "reminder" | "regular";
+
+function classifyConversation(c: Conversation): ConversationCategory {
+  // 1. Prefer structured metadata (future-proof)
+  if (c.metadata?.context_type === "nas_inplace") return "nas_inplace";
+  if (c.metadata?.context_type === "reminder") return "reminder";
+  // 2. Fall back to emoji title prefix (backward compat with existing sessions)
+  if (c.title?.startsWith("📎")) return "nas_inplace";
+  if (c.title?.startsWith("⏰")) return "reminder";
+  return "regular";
+}
+
+/** Extract the display name for a NAS InPlace AI conversation.
+ *  Prefers structured metadata; falls back to stripping the '📎 ' prefix. */
+function getNasFilename(c: Conversation): string {
+  if (c.metadata?.source_file?.filename) return c.metadata.source_file.filename;
+  const title = c.title ?? "";
+  return title.startsWith("📎 ") ? title.slice(2).trim() : title;
+}
+
+// ── Section Header ──────────────────────────────────────────────────────────
+
+function SectionHeader({
+  icon,
+  label,
+  count,
+  isOpen,
+  onToggle,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-2 px-4 py-1.5 text-left hover:bg-white/[0.03] transition-colors group"
+    >
+      <span className="text-white/25">{icon}</span>
+      <span className="flex-1 text-white/30 text-[11px] font-semibold uppercase tracking-[0.08em]">
+        {label}
+      </span>
+      <span className="text-[10px] text-white/20 bg-white/[0.05] px-1.5 py-0.5 rounded-full mr-1">
+        {count}
+      </span>
+      <span className="text-white/15 group-hover:text-white/30 transition-colors">
+        {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+      </span>
+    </button>
+  );
+}
+
+// ── Conversation Tile ───────────────────────────────────────────────────────
+
+function ConversationTile({
+  convo,
+  isActive,
+  showPin,
+  subtitle,
+  renameId,
+  renameTitle,
+  onSelect,
+  onRenameStart,
+  onRenameChange,
+  onRenameCommit,
+  onRenameCancel,
+  onPin,
+  onDelete,
+  formatDate,
+}: {
+  convo: Conversation;
+  isActive: boolean;
+  showPin?: boolean;
+  subtitle?: string; // file reference for NAS InPlace AI tiles
+  renameId: string | null;
+  renameTitle: string;
+  onSelect: () => void;
+  onRenameStart: () => void;
+  onRenameChange: (v: string) => void;
+  onRenameCommit: () => void;
+  onRenameCancel: () => void;
+  onPin: () => void;
+  onDelete: () => void;
+  formatDate: (d: string) => string;
+}) {
+  return (
+    <div
+      className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${
+        isActive
+          ? "bg-white/[0.08] border border-white/[0.1]"
+          : "hover:bg-white/[0.04] border border-transparent"
+      }`}
+      onClick={onSelect}
+    >
+      {/* Pin indicator */}
+      {showPin && convo.is_pinned && (
+        <Pin size={11} className="text-[var(--color-accent-cyan)]/50 shrink-0 rotate-45" />
+      )}
+
+      {/* Title / rename input + metadata */}
+      <div className="flex-1 min-w-0">
+        {renameId === convo.id ? (
+          <input
+            autoFocus
+            value={renameTitle}
+            onChange={(e) => onRenameChange(e.target.value)}
+            onBlur={onRenameCommit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onRenameCommit();
+              if (e.key === "Escape") onRenameCancel();
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full bg-white/10 rounded px-2 py-1 text-white text-xs focus:outline-none"
+          />
+        ) : (
+          <>
+            <p className="text-white/60 text-[13px] truncate leading-tight">
+              {convo.title || "Untitled"}
+            </p>
+            {subtitle && (
+              <p className="flex items-center gap-1 text-[10px] text-white/25 mt-0.5 truncate">
+                <Paperclip size={9} className="shrink-0 text-[var(--color-accent-blue)]/40" />
+                <span className="truncate">{subtitle}</span>
+              </p>
+            )}
+            {!subtitle && (
+              <p className="text-white/20 text-[10px] mt-0.5">
+                {formatDate(convo.created_at)}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Action buttons (visible on hover) */}
+      <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
+        <button
+          onClick={(e) => { e.stopPropagation(); onRenameStart(); }}
+          className="p-1 rounded text-white/20 hover:text-white/50 transition-colors"
+          title="Rename"
+        >
+          <Pencil size={12} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onPin(); }}
+          className="p-1 rounded text-white/20 hover:text-white/50 transition-colors"
+          title={convo.is_pinned ? "Unpin" : "Pin"}
+        >
+          <Pin size={12} className={convo.is_pinned ? "rotate-45" : ""} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="p-1 rounded text-white/20 hover:text-red-400/70 transition-colors"
+          title="Delete"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Sidebar ────────────────────────────────────────────────────────────
 
 interface ChatSidebarProps {
   isOpen: boolean;
@@ -44,6 +225,11 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
 
+  // Section open state — NAS & Reminders default collapsed, Regular open
+  const [nasOpen, setNasOpen] = useState(false);
+  const [remindersOpen, setRemindersOpen] = useState(false);
+  const [regularOpen, setRegularOpen] = useState(true);
+
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
@@ -53,6 +239,13 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
       ? (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())
       : true
   );
+
+  // Partition into categories
+  const pinned = filteredConversations.filter((c) => c.is_pinned);
+  const unpinned = filteredConversations.filter((c) => !c.is_pinned);
+  const nasChats = unpinned.filter((c) => classifyConversation(c) === "nas_inplace");
+  const reminders = unpinned.filter((c) => classifyConversation(c) === "reminder");
+  const regularChats = unpinned.filter((c) => classifyConversation(c) === "regular");
 
   const handleNewChat = (temporary = false) => {
     newChat(temporary, temporary ? "This chat won't be saved" : undefined);
@@ -65,22 +258,35 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
   };
 
   const handleRename = (id: string, title: string) => {
-    if (title.trim()) {
-      renameConversation(id, title.trim());
-    }
+    if (title.trim()) renameConversation(id, title.trim());
     setRenameId(null);
   };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
-    const isToday =
-      date.toDateString() === now.toDateString();
-    if (isToday) {
+    if (date.toDateString() === now.toDateString()) {
       return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
   };
+
+  const tileProps = (convo: Conversation) => ({
+    convo,
+    isActive: convo.id === conversationId,
+    renameId,
+    renameTitle,
+    onSelect: () => handleSelectConversation(convo.id),
+    onRenameStart: () => { setRenameId(convo.id); setRenameTitle(convo.title || ""); },
+    onRenameChange: setRenameTitle,
+    onRenameCommit: () => handleRename(convo.id, renameTitle),
+    onRenameCancel: () => setRenameId(null),
+    onPin: () => togglePin(convo.id, convo.is_pinned || false),
+    onDelete: () => deleteConversation(convo.id),
+    formatDate,
+  });
+
+  const totalCount = filteredConversations.length;
 
   return (
     <>
@@ -154,96 +360,120 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
         </div>
 
         {/* Conversation List */}
-        <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
-          {filteredConversations.map((convo) => {
-            const isActive = convo.id === conversationId;
-
-            return (
-              <div key={convo.id}
-                className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${
-                  isActive
-                    ? "bg-white/[0.08] border border-white/[0.1]"
-                    : "hover:bg-white/[0.04] border border-transparent"
-                }`}
-                onClick={() => handleSelectConversation(convo.id)}
-              >
-                {/* Pin indicator */}
-                {convo.is_pinned && (
-                  <Pin
-                    size={11}
-                    className="text-[var(--color-accent-cyan)]/50 shrink-0 rotate-45"
-                  />
-                )}
-
-                {/* Title or rename input */}
-                <div className="flex-1 min-w-0">
-                  {renameId === convo.id ? (
-                    <input
-                      autoFocus
-                      value={renameTitle}
-                      onChange={(e) => setRenameTitle(e.target.value)}
-                      onBlur={() => handleRename(convo.id, renameTitle)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleRename(convo.id, renameTitle);
-                        if (e.key === "Escape") setRenameId(null);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full bg-white/10 rounded px-2 py-1 text-white text-xs focus:outline-none"
-                    />
-                  ) : (
-                    <p className="text-white/60 text-[13px] truncate leading-tight">
-                      {convo.title || "Untitled"}
-                    </p>
-                  )}
-                  <p className="text-white/20 text-[10px] mt-0.5">
-                    {formatDate(convo.created_at)}
-                  </p>
-                </div>
-
-                {/* Action buttons (visible on hover) */}
-                <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRenameId(convo.id);
-                      setRenameTitle(convo.title || "");
-                    }}
-                    className="p-1 rounded text-white/20 hover:text-white/50 transition-colors"
-                    title="Rename"
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      togglePin(convo.id, convo.is_pinned || false);
-                    }}
-                    className="p-1 rounded text-white/20 hover:text-white/50 transition-colors"
-                    title={convo.is_pinned ? "Unpin" : "Pin"}
-                  >
-                    <Pin size={12} className={convo.is_pinned ? "rotate-45" : ""} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteConversation(convo.id);
-                    }}
-                    className="p-1 rounded text-white/20 hover:text-red-400/70 transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          {filteredConversations.length === 0 && (
+        <div className="flex-1 overflow-y-auto">
+          {totalCount === 0 ? (
             <div className="px-4 py-8 text-center">
               <MessageSquare size={24} className="text-white/10 mx-auto mb-2" />
               <p className="text-white/20 text-xs">
                 {searchQuery ? "No matching conversations" : "No conversations yet"}
               </p>
+            </div>
+          ) : (
+            <div className="py-1">
+
+              {/* ── Pinned ──────────────────────────────────────────── */}
+              {pinned.length > 0 && (
+                <div className="mb-1">
+                  <div className="flex items-center gap-2 px-4 py-1.5">
+                    <Pin size={11} className="text-white/25 rotate-45" />
+                    <span className="text-white/30 text-[11px] font-semibold uppercase tracking-[0.08em]">
+                      Pinned
+                    </span>
+                  </div>
+                  <div className="px-2 space-y-0.5">
+                    {pinned.map((c) => (
+                      <ConversationTile
+                        key={c.id}
+                        showPin
+                        subtitle={
+                          classifyConversation(c) === "nas_inplace"
+                            ? getNasFilename(c)
+                            : undefined
+                        }
+                        {...tileProps(c)}
+                      />
+                    ))}
+                  </div>
+                  <div className="my-2 mx-4 border-t border-white/[0.04]" />
+                </div>
+              )}
+
+              {/* ── NAS InPlace AI ───────────────────────────────────── */}
+              {nasChats.length > 0 && (
+                <div className="mb-1">
+                  <SectionHeader
+                    icon={<Paperclip size={12} />}
+                    label="NAS InPlace AI"
+                    count={nasChats.length}
+                    isOpen={nasOpen}
+                    onToggle={() => setNasOpen((p) => !p)}
+                  />
+                  {nasOpen && (
+                    <div className="px-2 space-y-0.5 mt-0.5">
+                      {nasChats.map((c) => (
+                        <ConversationTile
+                          key={c.id}
+                          subtitle={getNasFilename(c)}
+                          {...tileProps(c)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="my-2 mx-4 border-t border-white/[0.04]" />
+                </div>
+              )}
+
+              {/* ── Reminders ───────────────────────────────────────── */}
+              {reminders.length > 0 && (
+                <div className="mb-1">
+                  <SectionHeader
+                    icon={<AlarmClock size={12} />}
+                    label="Reminders"
+                    count={reminders.length}
+                    isOpen={remindersOpen}
+                    onToggle={() => setRemindersOpen((p) => !p)}
+                  />
+                  {remindersOpen && (
+                    <div className="px-2 space-y-0.5 mt-0.5">
+                      {reminders.map((c) => (
+                        <ConversationTile key={c.id} {...tileProps(c)} />
+                      ))}
+                    </div>
+                  )}
+                  <div className="my-2 mx-4 border-t border-white/[0.04]" />
+                </div>
+              )}
+
+              {/* ── Regular Chats ────────────────────────────────────── */}
+              {regularChats.length > 0 && (
+                <div>
+                  {/* Only show section header if other sections exist */}
+                  {(nasChats.length > 0 || reminders.length > 0 || pinned.length > 0) ? (
+                    <SectionHeader
+                      icon={<MessagesSquare size={12} />}
+                      label="Chats"
+                      count={regularChats.length}
+                      isOpen={regularOpen}
+                      onToggle={() => setRegularOpen((p) => !p)}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 px-4 py-1.5">
+                      <span className="text-white/30 text-[11px] font-semibold uppercase tracking-[0.08em]">
+                        Recent
+                      </span>
+                    </div>
+                  )}
+                  {regularOpen && (
+                    <div className="px-2 space-y-0.5 mt-0.5">
+                      {regularChats.map((c) => (
+                        <ConversationTile key={c.id} {...tileProps(c)} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="h-6" />
             </div>
           )}
         </div>

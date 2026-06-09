@@ -50,6 +50,15 @@ export interface Conversation {
   is_temporary?: boolean;
   message_count?: number;
   last_message_preview?: string;
+  /** Structured session metadata for client-side classification */
+  metadata?: {
+    context_type?: "nas_inplace" | "reminder" | "regular";
+    source_file?: {
+      file_id: string;
+      filename: string;
+      file_type: string;
+    };
+  };
 }
 
 export type MessageRole = "user" | "assistant" | "thinking" | "tool_use" | "tool_result" | "system";

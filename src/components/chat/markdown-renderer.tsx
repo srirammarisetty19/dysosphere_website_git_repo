@@ -10,7 +10,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { useState, type ComponentPropsWithoutRef } from "react";
 import { Check, Copy } from "lucide-react";
-import { apiClient } from "@/lib/api-client";
+import { AuthImage } from "@/components/ui/auth-image";
 
 // Import highlight.js atom-one-dark theme
 import "highlight.js/styles/atom-one-dark.css";
@@ -197,23 +197,18 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
             </a>
           ),
 
-          // ── Images ───────────────────────────────────────────────
-          img: ({ src, alt, ...props }) => {
-            const resolvedSrc = src ? apiClient.resolveFileUrl(String(src)) : "";
+          // ── Images (AuthImage for authenticated fetch) ────────────
+          img: ({ src, alt }) => {
+            if (!src) return null;
             return (
-            <span className="block my-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={resolvedSrc}
-                alt={alt || ""}
-                className="rounded-xl max-w-full border border-white/[0.08] shadow-lg"
-                loading="lazy"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-                {...props}
-              />
-            </span>
+              <span className="block my-4">
+                <AuthImage
+                  src={String(src)}
+                  alt={alt || ""}
+                  className="rounded-xl max-w-full border border-white/[0.08] shadow-lg"
+                  clickToOpen
+                />
+              </span>
             );
           },
         }}

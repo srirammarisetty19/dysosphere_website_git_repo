@@ -137,7 +137,7 @@ export default function NasHomePage() {
         try {
           const data = await nasApiClient.searchFiles(value.trim());
           const items: DisplayItem[] = data.map((raw: any) => {
-            const isDir = raw.parent_id !== undefined && !raw.mime_type;
+            const isDir = raw.parent_id !== undefined && raw.directory_id === undefined;
             return isDir
               ? { kind: "directory" as const, item: raw }
               : { kind: "file" as const, item: raw };

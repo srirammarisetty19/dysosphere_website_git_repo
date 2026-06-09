@@ -51,7 +51,7 @@ export default function SearchPage() {
     try {
       const data = await nasApiClient.searchFiles(q.trim());
       const items: DisplayItem[] = data.map((raw: any) => {
-        const isDir = raw.parent_id !== undefined && !raw.mime_type;
+        const isDir = raw.parent_id !== undefined && raw.directory_id === undefined;
         return isDir
           ? { kind: "directory" as const, item: raw }
           : { kind: "file" as const, item: raw };
@@ -208,8 +208,10 @@ export default function SearchPage() {
                         {file.name}
                       </p>
                       <p className="text-[11px] text-text-tertiary">
-                        AI Match ·{" "}
-                        {new Date(file.updated_at).toLocaleDateString()}
+                        AI Match
+                        {file.updated_at
+                          ? ` · ${new Date(file.updated_at).toLocaleDateString()}`
+                          : ""}
                       </p>
                     </div>
                   </button>

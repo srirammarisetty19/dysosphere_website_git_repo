@@ -42,6 +42,13 @@ interface ChatState {
   ) => Promise<void>;
   stopGeneration: () => void;
   cancelRun: () => Promise<void>;   // Cancel via registry + abort controller
+  /**
+   * Called on browser pagehide/beforeunload.
+   * Releases the local SSE connection so the browser can close cleanly,
+   * but does NOT send a cancel to the server — the run keeps going.
+   * On the next page open, loadConversation auto-resumes (Gemini pattern).
+   */
+  handlePageHide: () => void;
   loadConversation: (conversationId: string) => Promise<void>;
   newChat: (temporary?: boolean, description?: string) => void;
   deleteConversation: (conversationId: string) => Promise<void>;
@@ -52,23 +59,97 @@ interface ChatState {
   retryMessage: (assistantMessageIndex: number) => void;
 }
 
-// ── Structured Response Parser ────────────────────────────────────────
+// ── State-Machine Structured Response Parser ──────────────────────
 // Port of _parseStructuredResponse() from chat_provider.dart
+// A robust tag-aware parser that correctly handles unclosed XML tags
+// during streaming. Prevents <reasoning> content from flickering in the
+// visible response area. Industry pattern: Claude/ChatGPT/Gemini all
+// use structured tag parsing for reasoning/response separation.
 function parseStructuredContent(raw: string): string {
-  let cleaned = raw;
+  // Valid tags that switch parser state
+  const tags = [
+    "<reasoning>", "</reasoning>",
+    "<think>", "</think>",
+    "<thought>", "</thought>",
+    "<tool_call>", "</tool_call>",
+    "<response>", "</response>",
+  ];
+
+  let visible = "";
+  let reasoning = "";
+  let currentTag = "none";
+  let pos = 0;
+
+  while (pos < raw.length) {
+    // Find the next complete tag
+    let nextTagPos = -1;
+    let nextTag = "";
+    for (const t of tags) {
+      const idx = raw.indexOf(t, pos);
+      if (idx !== -1 && (nextTagPos === -1 || idx < nextTagPos)) {
+        nextTagPos = idx;
+        nextTag = t;
+      }
+    }
+
+    if (nextTagPos === -1) {
+      // No more completed tags found — append the rest
+      const chunk = raw.substring(pos);
+      if (
+        currentTag === "<reasoning>" ||
+        currentTag === "<think>" ||
+        currentTag === "<thought>" ||
+        currentTag === "<tool_call>"
+      ) {
+        reasoning += chunk;
+      } else {
+        // Visible text. Prevent partial tags at the end of the stream
+        // (like "<reaso") from flickering before they close.
+        let finalChunk = chunk;
+        const partialTagMatch = finalChunk.match(/<\/?[a-zA-Z_]*$/);
+        if (partialTagMatch) {
+          finalChunk = finalChunk.substring(0, partialTagMatch.index!);
+        }
+        visible += finalChunk;
+      }
+      break;
+    }
+
+    // Process text before the tag
+    const chunk = raw.substring(pos, nextTagPos);
+    if (
+      currentTag === "<reasoning>" ||
+      currentTag === "<think>" ||
+      currentTag === "<thought>" ||
+      currentTag === "<tool_call>"
+    ) {
+      reasoning += chunk;
+    } else if (currentTag === "none" || currentTag === "<response>") {
+      visible += chunk;
+    }
+
+    // State transition
+    if (nextTag.startsWith("</")) {
+      currentTag = "none";
+    } else {
+      currentTag = nextTag;
+    }
+
+    pos = nextTagPos + nextTag.length;
+  }
+
   // Strip markdown section headers injected by the agent engine
-  cleaned = cleaned.replace(/## USER QUERY:\s*/gm, "").trim();
-  cleaned = cleaned.replace(/^## FINAL ANSWER:?\s*/gm, "").trim();
-  cleaned = cleaned.replace(/^## ASSISTANT:?\s*/gm, "").trim();
-  // Convert <reasoning> and <thought> to <think> for consistent UI handling
-  cleaned = cleaned.replace(/<reasoning>/gi, "<think>").replace(/<\/reasoning>/gi, "</think>");
-  cleaned = cleaned.replace(/<thought>/gi, "<think>").replace(/<\/thought>/gi, "</think>");
-  // Strip <response> tags
-  cleaned = cleaned.replace(/<response>/gi, "").replace(/<\/response>/gi, "");
-  // Strip <tool_call> blocks (raw model output that leaked through)
-  cleaned = cleaned.replace(/<tool_call>\s*[\s\S]*?<\/tool_call>/gi, "").trim();
-  cleaned = cleaned.replace(/<tool_call>\s*[\s\S]*$/gi, "").trim(); // Unclosed tag at end of stream
-  return cleaned.trim();
+  visible = visible.replace(/## USER QUERY:\s*/gm, "").trim();
+  visible = visible.replace(/^## FINAL ANSWER:?\s*/gm, "").trim();
+  visible = visible.replace(/^## ASSISTANT:?\s*/gm, "").trim();
+
+  // Reconstruct: put reasoning into <think> tags for ThinkingBlock
+  let result = visible.trim();
+  if (reasoning.trim()) {
+    result = `<think>\n${reasoning.trim()}\n</think>\n${result}`;
+  }
+
+  return result.trim();
 }
 
 // Strip incomplete image markdown that arrives during streaming
@@ -77,7 +158,23 @@ function stripIncompleteImageMarkdown(text: string): string {
   return text.replace(/!\[[^\]]*$/, "").replace(/!\[[^\]]*\]\([^)]*$/, "");
 }
 
-export const useChatStore = create<ChatState>()((set, get) => ({
+export const useChatStore = create<ChatState>()((set, get) => {
+  // ── pagehide: browser close / tab navigate (Google / Claude pattern) ────────
+  // Release the SSE connection so the browser can unload cleanly,
+  // but do NOT cancel the server run. The agent keeps generating;
+  // when the user reopens the tab, loadConversation() auto-resumes.
+  if (typeof window !== "undefined") {
+    window.addEventListener("pagehide", () => {
+      const controller = get().abortController;
+      if (controller) {
+        controller.abort();
+        // Intentionally NOT calling cancelAgentRun — server keeps running
+        set({ abortController: null, isLoading: false, isResuming: false });
+      }
+    });
+  }
+
+  return {
   conversationId: null,
   currentTitle: null,
   messages: [],
@@ -421,11 +518,23 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const { abortController, conversationId } = get();
     if (abortController) {
       abortController.abort();
-      // Cancel the run on the server via the registry
+      // User explicitly pressed Stop — cancel the server run
       if (conversationId) {
         apiClient.cancelAgentRun(conversationId).catch(() => {});
       }
       set({ isLoading: false, isResuming: false, abortController: null });
+    }
+  },
+
+  handlePageHide: () => {
+    // Browser is closing / navigating away.
+    // Abort the local fetch connection so the browser unloads cleanly.
+    // Do NOT call cancelAgentRun — the server run continues and the user
+    // will auto-resume on next open (Gemini / Claude pattern).
+    const { abortController } = get();
+    if (abortController) {
+      abortController.abort();
+      set({ abortController: null, isLoading: false, isResuming: false });
     }
   },
 
@@ -445,7 +554,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   loadConversation: async (conversationId) => {
-    set({ isLoading: true, errorMessage: null });
+    // Use isLoadingHistory (not isLoading) to avoid triggering streaming UI
+    // on the last assistant message. isLoading is only set when actually
+    // resuming an active run. This matches the Flutter pattern and prevents
+    // the 3-second "thinking" flash on conversation reload.
+    set({ isLoadingHistory: true, errorMessage: null });
     try {
       const data = await apiClient.getConversation(conversationId);
       // Normalize server roles to UI roles and group blocks into turns
@@ -467,6 +580,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         currentTitle: data.title,
         messages: groupBlocksIntoTurns(rawMessages),
         isLoading: false,
+        isLoadingHistory: false,
         isTemporaryMode: false,
       });
 
@@ -653,6 +767,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     } catch (err) {
       set({
         isLoading: false,
+        isLoadingHistory: false,
         errorMessage: err instanceof Error ? err.message : "Failed to load conversation",
       });
     }
@@ -788,7 +903,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     // Re-send the original user message
     sendMessage(userText);
   },
-}));
+};
+});
 
 // ── Role Normalization ────────────────────────────────────────────────
 // Server uses roles like user_query, final_answer, thinking, tool_use, tool_result.

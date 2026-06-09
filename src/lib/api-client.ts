@@ -70,6 +70,13 @@ class ApiClient {
   private token: string | null = null;
   private serverUrl: string | null = null;
 
+  // ── Proactive Token Refresh (Google-style) ───────────────────────────
+  // Schedules a silent background refresh 60 seconds before the JWT exp.
+  // Also re-checks on tab focus (visibilitychange) so long-idle tabs
+  // never hit an expired token on the first action after waking up.
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private visibilityHandler: (() => void) | null = null;
+
   // ── Server URL Management ───────────────────────────────────────────
 
   /**
@@ -116,6 +123,102 @@ class ApiClient {
       return localStorage.getItem("sphere_token");
     }
     return null;
+  }
+
+  // ── JWT Expiry Helpers ───────────────────────────────────────────────
+
+  /**
+   * Decode the `exp` claim from a JWT without verifying the signature.
+   * Returns the expiry as a Unix timestamp (seconds), or null if unparseable.
+   */
+  private parseTokenExpiry(token: string): number | null {
+    try {
+      const parts = token.split(".");
+      if (parts.length !== 3) return null;
+      // base64url → base64 → JSON
+      const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const json = JSON.parse(atob(payload));
+      return typeof json.exp === "number" ? json.exp : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Returns true if the current token is expired (or expires within the
+   * next `bufferSec` seconds). Used for pre-flight checks before SSE streams.
+   */
+  isTokenExpiredOrExpiringSoon(bufferSec = 30): boolean {
+    const token = this.getToken();
+    if (!token) return true;
+    const exp = this.parseTokenExpiry(token);
+    if (!exp) return false; // Can't parse — assume valid
+    const nowSec = Math.floor(Date.now() / 1000);
+    return exp - nowSec <= bufferSec;
+  }
+
+  // ── Proactive Refresh Timer (Google / Slack pattern) ─────────────────
+
+  /**
+   * Schedule a background token refresh 60 seconds before the JWT expires.
+   * Also registers a `visibilitychange` listener so a long-idle tab refreshes
+   * the moment the user switches back to it — completely silently.
+   *
+   * Call this after login and after hydration from localStorage.
+   */
+  scheduleTokenRefresh(): void {
+    if (typeof window === "undefined") return;
+
+    // Cancel any existing timer
+    this.cancelTokenRefreshTimer();
+
+    const token = this.getToken();
+    if (!token) return;
+
+    const exp = this.parseTokenExpiry(token);
+    if (!exp) return;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const secondsUntilExpiry = exp - nowSec;
+
+    // Refresh 60 seconds before expiry (minimum 5s to avoid hammering if already near)
+    const refreshInMs = Math.max(5_000, (secondsUntilExpiry - 60) * 1000);
+
+    this.refreshTimer = setTimeout(async () => {
+      await this.tryRefreshToken();
+      // Reschedule after refresh so the cycle continues
+      this.scheduleTokenRefresh();
+    }, refreshInMs);
+
+    // ── visibilitychange: re-check when tab becomes active ──────────────
+    // Matches exactly what Slack and Notion do: silently re-validate the
+    // token whenever the user returns to the tab after being away.
+    if (!this.visibilityHandler) {
+      this.visibilityHandler = async () => {
+        if (document.visibilityState === "visible") {
+          if (this.isTokenExpiredOrExpiringSoon(60)) {
+            await this.tryRefreshToken();
+            this.scheduleTokenRefresh();
+          }
+        }
+      };
+      document.addEventListener("visibilitychange", this.visibilityHandler);
+    }
+  }
+
+  /**
+   * Cancel the background refresh timer and remove the visibilitychange
+   * listener. Call on logout / clearAuth.
+   */
+  cancelTokenRefreshTimer(): void {
+    if (this.refreshTimer !== null) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+    if (this.visibilityHandler && typeof window !== "undefined") {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
   }
 
   // ── URL Resolution ──────────────────────────────────────────────────
@@ -498,27 +601,55 @@ class ApiClient {
       signal?: AbortSignal;
     }
   ): AsyncGenerator<StreamEvent> {
-    const token = this.getToken();
+    // ── Pre-flight token check (Google pattern) ──────────────────────────
+    // SSE bypasses the normal request() interceptor, so we check the token
+    // expiry here before opening the stream. If it expires within 30s, refresh
+    // silently first — the user never sees a failure.
+    if (this.isTokenExpiredOrExpiringSoon(30)) {
+      await this.tryRefreshToken();
+    }
+
+    let token = this.getToken();
     const url = this.resolveUrl("/api/agents/stream");
 
-    const response = await fetch(url, {
+    const body = JSON.stringify({
+      message,
+      session_id: sessionId,
+      agent: options?.agent,
+      model: options?.model,
+      images: options?.images,
+      file_parts: options?.file_parts,
+      is_temporary: options?.isTemporary,
+      description: options?.description,
+    });
+
+    let response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({
-        message,
-        session_id: sessionId,
-        agent: options?.agent,
-        model: options?.model,
-        images: options?.images,
-        file_parts: options?.file_parts,
-        is_temporary: options?.isTemporary,
-        description: options?.description,
-      }),
+      body,
       signal: options?.signal,
     });
+
+    // ── 401 auto-retry (expired token during stream initiation) ─────────
+    // Mirrors what request() already does for regular JSON endpoints.
+    if (response.status === 401) {
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        token = this.getToken();
+        response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body,
+          signal: options?.signal,
+        });
+      }
+    }
 
     if (!response.ok) {
       let errorMessage: string;
@@ -770,6 +901,39 @@ class ApiClient {
 
   async fetchAuthenticatedBlob(storedPath: string): Promise<string> {
     const url = this.getArtifactFileUrl(storedPath);
+    const token = this.getToken();
+    const resp = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) throw new Error(`Failed to fetch file: ${resp.status}`);
+    const blob = await resp.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  /**
+   * Fetch any server file path with auth and return a blob URL.
+   * Handles both:
+   *   - Chat image paths: /files/user123/image.jpg, /images/download?file_id=xxx
+   *   - Artifact stored paths: user123/artifacts/image.png (bare, no /files/ prefix)
+   *
+   * Industry pattern: Google Workspace, Notion, Slack all use this approach
+   * for authenticated media — fetch with Bearer token → blob URL.
+   */
+  async fetchAuthenticatedFileBlob(filePath: string): Promise<string> {
+    let url: string;
+
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      // Already absolute
+      url = filePath;
+    } else if (filePath.startsWith('/files/') || filePath.startsWith('/images/') || filePath.startsWith('/api/')) {
+      // Chat image or API path — resolve through the standard API route mapper
+      url = this.resolveFileUrl(filePath);
+    } else {
+      // Bare path (artifact stored_path like "user123/artifacts/img.png")
+      // Use the artifact-specific URL builder
+      url = this.getArtifactFileUrl(filePath);
+    }
+
     const token = this.getToken();
     const resp = await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
