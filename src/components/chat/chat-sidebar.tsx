@@ -41,12 +41,14 @@ import type { Conversation } from "@/lib/types";
 type ConversationCategory = "nas_inplace" | "reminder" | "regular";
 
 function classifyConversation(c: Conversation): ConversationCategory {
-  // 1. Prefer structured metadata (future-proof)
+  // 1. Prefer structured metadata (authoritative — set at session birth)
   if (c.metadata?.context_type === "nas_inplace") return "nas_inplace";
   if (c.metadata?.context_type === "reminder") return "reminder";
-  // 2. Fall back to emoji title prefix (backward compat with existing sessions)
+  // 2. Fall back to title pattern matching (backward compat with untagged sessions)
   if (c.title?.startsWith("📎")) return "nas_inplace";
   if (c.title?.startsWith("⏰")) return "reminder";
+  if (c.title?.startsWith("[heartbeat]")) return "reminder";
+  if (c.title?.startsWith("[trigger]")) return "reminder";
   return "regular";
 }
 

@@ -446,6 +446,7 @@ class ApiClient {
         updated_at: string;
         message_count: number;
         last_message_preview: string;
+        metadata?: Record<string, unknown>;
       }>;
       total: number;
     }>(`/api/history?limit=${limit}&page=${page}`);
@@ -457,6 +458,7 @@ class ApiClient {
         created_at: c.updated_at || c.created_at,
         message_count: c.message_count,
         last_message_preview: c.last_message_preview,
+        metadata: c.metadata as Conversation["metadata"],
       })),
       total: raw.total,
     };
