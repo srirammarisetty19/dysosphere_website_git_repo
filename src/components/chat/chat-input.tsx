@@ -26,9 +26,10 @@ interface ChatInputProps {
   onSend: (message: string, attachments?: File[]) => void;
   isLoading: boolean;
   onStop: () => void;
+  uploadProgress?: { current: number; total: number; filename: string } | null;
 }
 
-export function ChatInput({ onSend, isLoading, onStop }: ChatInputProps) {
+export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -222,6 +223,29 @@ export function ChatInput({ onSend, isLoading, onStop }: ChatInputProps) {
             <div className="flex items-center gap-2 text-[var(--color-accent-cyan)]/60 text-sm">
               <Paperclip size={16} />
               <span>Drop files here to attach</span>
+            </div>
+          </div>
+        )}
+
+        {/* Upload progress bar */}
+        {uploadProgress && (
+          <div className="mb-3 px-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-white/40 text-xs font-medium">
+                Uploading {uploadProgress.current}/{uploadProgress.total}
+                {uploadProgress.filename && (
+                  <span className="text-white/25 ml-1.5">— {uploadProgress.filename}</span>
+                )}
+              </span>
+              <span className="text-white/20 text-[10px] font-mono">
+                {Math.round((uploadProgress.current / uploadProgress.total) * 100)}%
+              </span>
+            </div>
+            <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                className="h-full rounded-full gradient-bg transition-all duration-500 ease-out"
+                style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+              />
             </div>
           </div>
         )}

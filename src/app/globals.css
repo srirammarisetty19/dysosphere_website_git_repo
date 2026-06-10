@@ -231,7 +231,7 @@ body {
 }
 
 /* ── Focus Ring ────────────────────────────────────────────────────────── */
-*:focus-visible {
+*:focus-visible:not(textarea):not(input[type="text"]):not(input[type="search"]) {
   outline: 2px solid var(--color-accent-cyan);
   outline-offset: 2px;
 }

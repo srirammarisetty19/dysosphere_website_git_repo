@@ -24,6 +24,9 @@ interface ChatState {
   errorMessage: string | null;
   truncationWarning: string | null;  // Shown when input was truncated (Google/OpenAI typed event)
 
+  // Upload progress (null when not uploading)
+  uploadProgress: { current: number; total: number; filename: string } | null;
+
   // Conversation list
   conversations: Conversation[];
   isLoadingHistory: boolean;
@@ -263,6 +266,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
   iterationSummaries: [],
   errorMessage: null,
   truncationWarning: null,
+  uploadProgress: null,
   conversations: [],
   isLoadingHistory: false,
   abortController: null,
@@ -355,8 +359,11 @@ export const useChatStore = create<ChatState>()((set, get) => {
     }
     // Path 2: Fresh file uploads
     else if (options?.attachments && options.attachments.length > 0) {
-      set({ currentActivity: "Uploading files..." });
-      for (const file of options.attachments) {
+      const totalFiles = options.attachments.length;
+      set({ currentActivity: "Uploading files...", uploadProgress: { current: 0, total: totalFiles, filename: options.attachments[0].name } });
+      for (let _fileIdx = 0; _fileIdx < options.attachments.length; _fileIdx++) {
+        const file = options.attachments[_fileIdx];
+        set({ uploadProgress: { current: _fileIdx + 1, total: totalFiles, filename: file.name } });
         try {
           const result = await apiClient.uploadFile(file);
           const fileUrl = result.file_url || result.stored_path || "";
@@ -382,7 +389,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           // Continue even if one upload fails
         }
       }
-      set({ currentActivity: null });
+      set({ currentActivity: null, uploadProgress: null });
 
       // ── Update user message with server-confirmed file parts ──────
       // Replace optimistic parts (no file_url) with real server data.
@@ -665,6 +672,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         isLoading: false,
         isResuming: false,
         currentActivity: null,
+        uploadProgress: null,
         abortController: null,
       });
 

@@ -27,6 +27,7 @@ export default function ChatPage() {
     iterationSummaries,
     errorMessage,
     truncationWarning,
+    uploadProgress,
     sendMessage,
     stopGeneration,
     loadConversations,
@@ -168,6 +169,7 @@ export default function ChatPage() {
         onSend={handleSend}
         isLoading={isLoading}
         onStop={stopGeneration}
+        uploadProgress={uploadProgress}
       />
     </>
   );
