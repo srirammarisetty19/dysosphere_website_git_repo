@@ -575,11 +575,16 @@ function AssistantBubble({
           </div>
         )}
 
-        {/* ── Action Row: Copy | Read Aloud ───────────────────────────── */}
+        {/* ── Action Row: Copy | Retry | Read Aloud | Share | Feedback ───── */}
+        {/* Industry standard (ChatGPT/Gemini): retry on assistant bubble   */}
         {finalResponse && !isStreaming && (
           <div className="flex items-center gap-0.5 mt-1">
             <CopyButton text={finalResponse} />
+            <RetryButton messageIndex={messageIndex} />
             <ReadAloudButton text={finalResponse} />
+            <ShareButton text={finalResponse} />
+            <ThumbsButton messageIndex={messageIndex} direction="up" />
+            <ThumbsButton messageIndex={messageIndex} direction="down" />
 
             {/* Timestamp */}
             {message.created_at && (

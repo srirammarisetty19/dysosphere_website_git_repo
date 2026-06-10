@@ -80,6 +80,8 @@ export const useAuthStore = create<AuthState>()(
 
           // Start the background refresh timer now that we have a valid token
           apiClient.scheduleTokenRefresh();
+          // Start real-time notification WebSocket (Google/Slack pattern)
+          apiClient.connectNotificationWebSocket();
         } catch (err) {
           set({
             isLoading: false,
@@ -120,6 +122,8 @@ export const useAuthStore = create<AuthState>()(
 
           // Start the background refresh timer
           apiClient.scheduleTokenRefresh();
+          // Start real-time notification WebSocket
+          apiClient.connectNotificationWebSocket();
         } catch (err) {
           set({
             isLoading: false,
@@ -138,6 +142,8 @@ export const useAuthStore = create<AuthState>()(
 
         // Stop the background refresh timer
         apiClient.cancelTokenRefreshTimer();
+        // Stop notification WebSocket
+        apiClient.disconnectNotificationWebSocket();
 
         const { accounts, activeAccount } = get();
         const remaining = accounts.filter(
@@ -179,6 +185,8 @@ export const useAuthStore = create<AuthState>()(
         }
         // Stop the background refresh timer
         apiClient.cancelTokenRefreshTimer();
+        // Stop notification WebSocket
+        apiClient.disconnectNotificationWebSocket();
         set({
           user: null,
           activeAccount: null,
@@ -249,6 +257,8 @@ export const useAuthStore = create<AuthState>()(
         apiClient.setServerUrl(null);
         // Stop the background refresh timer
         apiClient.cancelTokenRefreshTimer();
+        // Stop notification WebSocket
+        apiClient.disconnectNotificationWebSocket();
         set({
           user: null,
           activeAccount: null,
@@ -293,6 +303,8 @@ export const useAuthStore = create<AuthState>()(
           // schedule a silent refresh before it expires.
           if (state?.activeAccount?.token) {
             apiClient.scheduleTokenRefresh();
+            // Start real-time notification WebSocket
+            apiClient.connectNotificationWebSocket();
           }
         });
         void error; // suppress unused-var lint

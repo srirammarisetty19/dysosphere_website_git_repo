@@ -54,6 +54,7 @@ export interface PersonCluster {
   face_count: number;
   representative_file_id: string | null;
   thumbnail_url: string | null;
+  last_seen: string | null;
 }
 
 export interface ClusterPhotosResponse {

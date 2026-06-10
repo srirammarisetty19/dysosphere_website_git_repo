@@ -99,8 +99,10 @@ function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [isOpen]);
 
-  // Poll unread count every 30s
+  // Real-time badge updates via WebSocket (Google/Slack pattern)
+  // Falls back to REST polling if WS is not connected.
   useEffect(() => {
+    // Initial fetch via REST API
     const fetchUnread = async () => {
       try {
         const count = await apiClient.getUnreadCount();
@@ -110,8 +112,24 @@ function NotificationBell() {
       }
     };
     fetchUnread();
-    const interval = setInterval(fetchUnread, 30000);
-    return () => clearInterval(interval);
+
+    // Subscribe to WebSocket events for real-time updates
+    const unsubscribe = apiClient.onNotification((event) => {
+      if (event.type === "badge_update" && typeof event.unread_count === "number") {
+        setUnreadCount(event.unread_count);
+      } else if (event.type === "notification") {
+        // New notification arrived — increment badge
+        setUnreadCount((prev) => prev + 1);
+      }
+    });
+
+    // Fallback polling every 60s (in case WS is not connected)
+    const interval = setInterval(fetchUnread, 60_000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, []);
 
   const loadNotifications = async () => {

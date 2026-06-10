@@ -359,6 +359,8 @@ class ApiClient {
       if (response.ok) {
         const data: AuthResponse = await response.json();
         this.setToken(data.access_token);
+        // Reconnect notification WebSocket with fresh token (Google/Slack pattern)
+        this.reconnectNotificationWebSocketAfterRefresh();
         return true;
       }
     } catch {
@@ -953,6 +955,197 @@ class ApiClient {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  // ── Notification WebSocket (Google/Slack/OpenAI pattern) ──────────────
+  // Real-time push notifications via WebSocket. Uses the latest JWT
+  // token from the auth store on every (re)connection attempt, so token
+  // refreshes automatically propagate to the WebSocket layer.
+  //
+  // Architecture (exactly matching Google Chat / Slack):
+  //   1. Connect with fresh JWT as ?token= query parameter
+  //   2. On disconnect/error → exponential backoff reconnect (capped at 30s)
+  //   3. On token refresh → reconnect immediately with new token
+  //   4. Heartbeat ping every 25s to detect dead connections proactively
+  //   5. visibilitychange → reconnect on tab wake if disconnected
+
+  private _notifWs: WebSocket | null = null;
+  private _notifReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private _notifPingTimer: ReturnType<typeof setInterval> | null = null;
+  private _notifReconnectAttempt = 0;
+  private _notifListeners: Set<(event: { type: string; [key: string]: unknown }) => void> = new Set();
+  private _notifWsActive = false; // true when the user wants the WS open
+
+  /**
+   * Build the WebSocket URL using the current (freshest) token.
+   * Always called at connection time so token refreshes propagate automatically.
+   */
+  private _buildNotifWsUrl(): string | null {
+    const token = this.getToken();
+    if (!token) return null;
+
+    const server = this.getServerUrl();
+    if (!server) return null;
+
+    // Convert http(s) → ws(s)
+    const wsBase = server.replace(/^http/, "ws");
+    return `${wsBase}/api/ai/ws/notifications?token=${encodeURIComponent(token)}`;
+  }
+
+  /**
+   * Start the notification WebSocket connection.
+   * Call after login and after hydration from localStorage.
+   * Idempotent — safe to call multiple times.
+   */
+  connectNotificationWebSocket(): void {
+    if (typeof window === "undefined") return;
+    this._notifWsActive = true;
+    this._connectNotifWs();
+
+    // Also reconnect when tab becomes visible (matches Slack behavior)
+    if (!this._notifVisibilityHandler) {
+      this._notifVisibilityHandler = () => {
+        if (document.visibilityState === "visible" && this._notifWsActive) {
+          if (!this._notifWs || this._notifWs.readyState !== WebSocket.OPEN) {
+            this._notifReconnectAttempt = 0; // Reset backoff on manual wake
+            this._connectNotifWs();
+          }
+        }
+      };
+      document.addEventListener("visibilitychange", this._notifVisibilityHandler);
+    }
+  }
+
+  private _notifVisibilityHandler: (() => void) | null = null;
+
+  /**
+   * Disconnect the notification WebSocket cleanly.
+   * Call on logout / clearAuth.
+   */
+  disconnectNotificationWebSocket(): void {
+    this._notifWsActive = false;
+    this._cleanupNotifWs();
+  }
+
+  /**
+   * Register a listener for notification events.
+   * Returns an unsubscribe function (React useEffect pattern).
+   */
+  onNotification(callback: (event: { type: string; [key: string]: unknown }) => void): () => void {
+    this._notifListeners.add(callback);
+    return () => { this._notifListeners.delete(callback); };
+  }
+
+  /**
+   * Called after a token refresh succeeds. Reconnects the notification WS
+   * with the new token so it doesn't get rejected with 403.
+   * This is exactly what Google and Slack do: reconnect WS after token rotation.
+   */
+  reconnectNotificationWebSocketAfterRefresh(): void {
+    if (!this._notifWsActive) return;
+    // Close existing connection (will trigger reconnect with fresh token)
+    if (this._notifWs) {
+      this._notifWs.close(1000, "Token refreshed — reconnecting");
+    }
+    this._notifReconnectAttempt = 0;
+    this._connectNotifWs();
+  }
+
+  private _connectNotifWs(): void {
+    if (typeof window === "undefined" || !this._notifWsActive) return;
+
+    // Cleanup any existing connection/timers
+    this._cleanupNotifWs();
+
+    const url = this._buildNotifWsUrl();
+    if (!url) return;
+
+    try {
+      const ws = new WebSocket(url);
+      this._notifWs = ws;
+
+      ws.onopen = () => {
+        console.log("[NotifWS] Connected");
+        this._notifReconnectAttempt = 0;
+
+        // Start heartbeat ping (exactly like Slack: ping every 25s)
+        this._notifPingTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "ping" }));
+          }
+        }, 25_000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          // Dispatch to all listeners
+          for (const listener of this._notifListeners) {
+            try { listener(data); } catch { /* listener error — non-critical */ }
+          }
+        } catch {
+          // Malformed message — skip
+        }
+      };
+
+      ws.onclose = (event) => {
+        console.log(`[NotifWS] Closed: code=${event.code}, reason=${event.reason}`);
+        this._clearNotifTimers();
+
+        // Reconnect with exponential backoff (capped at 30s)
+        if (this._notifWsActive && event.code !== 1000) {
+          this._scheduleNotifReconnect();
+        }
+      };
+
+      ws.onerror = () => {
+        // onclose will fire after onerror — reconnect handled there
+        console.log("[NotifWS] Connection error");
+      };
+    } catch {
+      // WebSocket constructor failed — schedule reconnect
+      this._scheduleNotifReconnect();
+    }
+  }
+
+  private _scheduleNotifReconnect(): void {
+    if (!this._notifWsActive) return;
+    if (this._notifReconnectTimer) return; // Already scheduled
+
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
+    const delaySec = Math.min(30, Math.pow(2, this._notifReconnectAttempt));
+    this._notifReconnectAttempt++;
+
+    console.log(`[NotifWS] Reconnecting in ${delaySec}s (attempt ${this._notifReconnectAttempt})`);
+    this._notifReconnectTimer = setTimeout(() => {
+      this._notifReconnectTimer = null;
+      this._connectNotifWs();
+    }, delaySec * 1000);
+  }
+
+  private _clearNotifTimers(): void {
+    if (this._notifPingTimer) {
+      clearInterval(this._notifPingTimer);
+      this._notifPingTimer = null;
+    }
+  }
+
+  private _cleanupNotifWs(): void {
+    this._clearNotifTimers();
+    if (this._notifReconnectTimer) {
+      clearTimeout(this._notifReconnectTimer);
+      this._notifReconnectTimer = null;
+    }
+    if (this._notifWs) {
+      this._notifWs.onclose = null; // Prevent reconnect loop
+      this._notifWs.onerror = null;
+      this._notifWs.onmessage = null;
+      if (this._notifWs.readyState === WebSocket.OPEN ||
+          this._notifWs.readyState === WebSocket.CONNECTING) {
+        this._notifWs.close(1000, "Cleanup");
+      }
+      this._notifWs = null;
     }
   }
 }

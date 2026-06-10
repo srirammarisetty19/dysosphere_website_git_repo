@@ -38,6 +38,8 @@ interface ChatState {
       model?: string;
       images?: string[];
       attachments?: File[];
+      /** Already-uploaded file refs for retry (skip re-upload). Google pattern. */
+      fileParts?: Array<{ file_url: string; filename: string; media_type: string; mime_type?: string }>;
     }
   ) => Promise<void>;
   stopGeneration: () => void;
@@ -172,6 +174,51 @@ export const useChatStore = create<ChatState>()((set, get) => {
         set({ abortController: null, isLoading: false, isResuming: false });
       }
     });
+
+    // ── visibilitychange: auto-resume on tab/app return (Google/Claude/OpenAI pattern) ──
+    // When user switches tabs or navigates to another chat and returns,
+    // check if the server has completed or is still running, and act accordingly.
+    // This is exactly what ChatGPT does: silently reload state on tab focus.
+    document.addEventListener("visibilitychange", async () => {
+      if (document.visibilityState !== "visible") return;
+      const { conversationId, isLoading, abortController } = get();
+      if (!conversationId || isLoading) return; // Already streaming or no conversation
+
+      try {
+        const runStatus = await apiClient.getRunStatus(conversationId);
+        if (runStatus.has_active_run) {
+          // Server is still generating — auto-resume the stream
+          console.log(`[Chat] Tab visible: active run detected — auto-resuming`);
+          get().loadConversation(conversationId);
+        } else if (runStatus.status === "done" || runStatus.status === "error") {
+          // Run completed while we were away — reload messages from DB
+          console.log(`[Chat] Tab visible: run completed (${runStatus.status}) — reloading messages`);
+          try {
+            const data = await apiClient.getConversation(conversationId);
+            const rawMessages: Message[] = data.messages.map((m) => ({
+              ...m,
+              role: normalizeRole(m.role || "assistant"),
+              content: parseStructuredContent(m.content || ""),
+              created_at: m.created_at || new Date().toISOString(),
+              steps: m.steps || [],
+              thinking_duration_sec: m.thinking_duration_sec || 0,
+              image_urls: m.image_urls || [],
+              attachments: m.attachments || [],
+              nas_files: m.nas_files || [],
+              parts: m.parts || [],
+            }));
+            set({
+              messages: groupBlocksIntoTurns(rawMessages),
+              errorMessage: null,
+            });
+          } catch {
+            // Silent — keep current state
+          }
+        }
+      } catch {
+        // run-status check failed — non-critical
+      }
+    });
   }
 
   return {
@@ -231,9 +278,19 @@ export const useChatStore = create<ChatState>()((set, get) => {
     set({ abortController });
 
     // Upload attachments and build structured file parts (industry standard)
+    // ── File parts: use pre-built refs (retry) or upload new files ──
+    // Industry pattern (Google/OpenAI): retry references existing uploaded
+    // files by their server URL instead of re-uploading. New messages upload
+    // fresh files via the upload API.
     const fileParts: Array<{ file_url: string; filename: string; media_type: string; mime_type?: string }> = [];
     let documentContext = "";
-    if (options?.attachments && options.attachments.length > 0) {
+
+    // Path 1: Pre-built file_parts from retry (already uploaded — no re-upload)
+    if (options?.fileParts && options.fileParts.length > 0) {
+      fileParts.push(...options.fileParts);
+    }
+    // Path 2: Fresh file uploads
+    else if (options?.attachments && options.attachments.length > 0) {
       set({ currentActivity: "Uploading files..." });
       for (const file of options.attachments) {
         try {
@@ -895,13 +952,50 @@ export const useChatStore = create<ChatState>()((set, get) => {
     }
     if (userIndex < 0) return;
 
-    const userText = messages[userIndex].content;
+    const userMsg = messages[userIndex];
 
-    // Truncate: keep everything before the user message being retried
-    set({ messages: messages.slice(0, userIndex) });
+    // ── Extract clean user text (Google/OpenAI retry pattern) ──
+    // Use structured parts (preferred) to get the clean text without
+    // injected metadata markers like [Uploaded Image: ...].
+    let cleanText = userMsg.content;
+    if (userMsg.parts && userMsg.parts.length > 0) {
+      const textParts = userMsg.parts.filter((p) => p.type === "text");
+      if (textParts.length > 0) {
+        cleanText = textParts.map((p) => p.content || "").join("\n").trim();
+      }
+    }
 
-    // Re-send the original user message
-    sendMessage(userText);
+    // ── Reference existing uploaded files (no re-upload) ──
+    // Industry pattern: Google/Anthropic retry sends file references,
+    // not raw File objects. The files are already on the server.
+    const existingFileParts = userMsg.parts
+      ?.filter((p) => p.type !== "text" && p.file_url)
+      .map((p) => ({
+        file_url: p.file_url!,
+        filename: p.filename || "file",
+        media_type: p.type || "file",
+        mime_type: p.mime_type,
+      })) || [];
+
+    // Also check legacy image_urls (older messages without parts)
+    if (existingFileParts.length === 0 && userMsg.image_urls && userMsg.image_urls.length > 0) {
+      for (const url of userMsg.image_urls) {
+        existingFileParts.push({
+          file_url: url,
+          filename: "image",
+          media_type: "image",
+          mime_type: undefined,
+        });
+      }
+    }
+
+    // Clear error state and truncate conversation
+    set({ messages: messages.slice(0, userIndex), errorMessage: null });
+
+    // Re-send with original text + existing file references
+    sendMessage(cleanText, {
+      fileParts: existingFileParts.length > 0 ? existingFileParts : undefined,
+    });
   },
 };
 });
