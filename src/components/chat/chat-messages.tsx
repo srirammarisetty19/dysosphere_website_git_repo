@@ -27,6 +27,12 @@ import {
   ThumbsUp,
   ThumbsDown,
   Paperclip,
+  FileText as FileTextIcon,
+  FileCode,
+  FileSpreadsheet,
+  FileAudio,
+  FileVideo,
+  File as FileIcon,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { useChatStore } from "@/stores/chat-store";
@@ -337,6 +343,52 @@ function ThumbsButton({
   );
 }
 
+// ── File Part Chip (for non-image attachments) ──────────────────────────
+// Industry pattern (ChatGPT/Gemini): compact chip with type-specific icon
+function FilePartChip({ part }: { part: MessagePart }) {
+  const filename = part.filename || "File";
+  const parts_ = filename.split(".");
+  const ext = parts_.length > 1 ? parts_[parts_.length - 1] : "";
+  const extLower = ext.toLowerCase();
+
+  // Map file type to icon and color
+  let Icon = FileIcon;
+  let color = "text-white/40";
+  let bgColor = "bg-white/[0.06]";
+  let borderColor = "border-white/[0.08]";
+  let label = extLower.toUpperCase() || "FILE";
+
+  if (extLower === "pdf") {
+    Icon = FileTextIcon; color = "text-red-400"; bgColor = "bg-red-500/10"; borderColor = "border-red-500/20"; label = "PDF";
+  } else if (["doc", "docx"].includes(extLower)) {
+    Icon = FileTextIcon; color = "text-blue-400"; bgColor = "bg-blue-500/10"; borderColor = "border-blue-500/20"; label = "DOC";
+  } else if (["xlsx", "xls", "csv"].includes(extLower)) {
+    Icon = FileSpreadsheet; color = "text-green-400"; bgColor = "bg-green-500/10"; borderColor = "border-green-500/20"; label = extLower.toUpperCase();
+  } else if (["py", "js", "ts", "dart", "java", "c", "cpp", "h", "rs", "go", "rb", "swift", "kt"].includes(extLower)) {
+    Icon = FileCode; color = "text-cyan-400"; bgColor = "bg-cyan-500/10"; borderColor = "border-cyan-500/20"; label = extLower.toUpperCase();
+  } else if (["txt", "md", "json", "xml", "yaml", "yml", "html"].includes(extLower)) {
+    Icon = FileTextIcon; color = "text-gray-400"; bgColor = "bg-gray-500/10"; borderColor = "border-gray-500/20"; label = extLower.toUpperCase();
+  } else if (["wav", "mp3", "m4a", "ogg", "flac"].includes(extLower) || part.type === "audio") {
+    Icon = FileAudio; color = "text-green-400"; bgColor = "bg-green-500/10"; borderColor = "border-green-500/20"; label = "AUDIO";
+  } else if (["mp4", "mov", "avi", "mkv"].includes(extLower) || part.type === "video") {
+    Icon = FileVideo; color = "text-purple-400"; bgColor = "bg-purple-500/10"; borderColor = "border-purple-500/20"; label = "VIDEO";
+  } else if (part.type === "document") {
+    Icon = FileTextIcon; color = "text-orange-400"; bgColor = "bg-orange-500/10"; borderColor = "border-orange-500/20"; label = "DOCUMENT";
+  }
+
+  return (
+    <div className={`flex items-center gap-2.5 px-3 py-2 rounded-xl ${bgColor} border ${borderColor} max-w-[240px]`}>
+      <div className={`w-8 h-8 rounded-lg ${bgColor} flex items-center justify-center shrink-0`}>
+        <Icon size={16} className={color} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-white text-xs font-medium truncate">{filename}</p>
+        <p className={`text-[10px] font-semibold ${color} opacity-70`}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
 // ── User Bubble ─────────────────────────────────────────────────────────
 function UserBubble({
   content,
@@ -429,6 +481,19 @@ function UserBubble({
             ))}
           </div>
         )}
+        {/* Non-image file parts (documents, code, audio, etc.) */}
+        {/* Industry pattern (ChatGPT/Gemini): icon chip with filename */}
+        {hasParts && (() => {
+          const fileParts = parts!.filter((p) => p.type !== 'text' && p.type !== 'image');
+          if (fileParts.length === 0) return null;
+          return (
+            <div className="flex flex-wrap gap-2 mb-2 justify-end">
+              {fileParts.map((part, i) => (
+                <FilePartChip key={i} part={part} />
+              ))}
+            </div>
+          );
+        })()}
         {displayContent && (
           <div className="px-4 py-3 rounded-2xl rounded-br-md bg-gradient-to-br from-white/[0.08] to-white/[0.04] border border-white/[0.08]">
             <p className="text-white text-[15px] leading-relaxed whitespace-pre-wrap">

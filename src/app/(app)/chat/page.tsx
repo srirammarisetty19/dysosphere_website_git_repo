@@ -12,7 +12,7 @@ import { apiClient } from "@/lib/api-client";
 import { ChatMessages } from "@/components/chat/chat-messages";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ChatHeader } from "@/components/chat/chat-header";
-import { Sparkles, Zap, Search, FileText, Brain, Globe } from "lucide-react";
+import { Sparkles, Zap, Search, FileText, Brain, Globe, Scissors } from "lucide-react";
 
 export default function ChatPage() {
   const { user } = useAuthStore();
@@ -26,10 +26,12 @@ export default function ChatPage() {
     currentActivity,
     iterationSummaries,
     errorMessage,
+    truncationWarning,
     sendMessage,
     stopGeneration,
     loadConversations,
     clearError,
+    clearTruncationWarning,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -80,6 +82,14 @@ export default function ChatPage() {
     }
   }, [errorMessage, clearError]);
 
+  // Truncation warning auto-dismiss (longer duration — 15s)
+  useEffect(() => {
+    if (truncationWarning) {
+      const timer = setTimeout(clearTruncationWarning, 15000);
+      return () => clearTimeout(timer);
+    }
+  }, [truncationWarning, clearTruncationWarning]);
+
   const handleSend = async (message: string, attachments?: File[]) => {
     await sendMessage(message, { attachments });
     scrollToBottom();
@@ -118,6 +128,20 @@ export default function ChatPage() {
           <button
             onClick={clearError}
             className="text-red-400/60 hover:text-red-400 text-xs font-medium px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors"
+          >
+            DISMISS
+          </button>
+        </div>
+      )}
+
+      {/* Truncation Warning Banner (Google/OpenAI pattern: typed event, amber) */}
+      {truncationWarning && (
+        <div className="mx-4 mt-2 flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 animate-in slide-in-from-top-2 duration-300">
+          <Scissors size={16} className="text-amber-400 flex-shrink-0" />
+          <p className="text-amber-400 text-sm flex-1">{truncationWarning}</p>
+          <button
+            onClick={clearTruncationWarning}
+            className="text-amber-400/60 hover:text-amber-400 text-xs font-medium px-2 py-1 rounded-lg hover:bg-amber-500/10 transition-colors"
           >
             DISMISS
           </button>

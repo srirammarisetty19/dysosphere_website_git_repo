@@ -111,7 +111,8 @@ export type StreamEventType =
   | "title"            // Auto-generated title
   | "iteration_summary"
   | "plan_update"
-  | "resume_status";   // Registry resume/replay indicator
+  | "resume_status"    // Registry resume/replay indicator
+  | "truncation_warning"; // Input was truncated (Google/OpenAI typed event)
 
 export interface StreamEvent {
   type: StreamEventType;
@@ -123,6 +124,7 @@ export interface StreamEvent {
   nas_files?: NasFileResult[];
   session_id?: string;
   title?: string;
+  is_truncated?: boolean;
   timestamp?: string;
 }
 

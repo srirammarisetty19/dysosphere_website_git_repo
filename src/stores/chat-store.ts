@@ -22,6 +22,7 @@ interface ChatState {
   currentActivity: string | null;
   iterationSummaries: string[];
   errorMessage: string | null;
+  truncationWarning: string | null;  // Shown when input was truncated (Google/OpenAI typed event)
 
   // Conversation list
   conversations: Conversation[];
@@ -58,6 +59,7 @@ interface ChatState {
   togglePin: (conversationId: string, isPinned: boolean) => void;
   loadConversations: () => Promise<void>;
   clearError: () => void;
+  clearTruncationWarning: () => void;
   retryMessage: (assistantMessageIndex: number) => void;
 }
 
@@ -232,6 +234,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
   currentActivity: null,
   iterationSummaries: [],
   errorMessage: null,
+  truncationWarning: null,
   conversations: [],
   isLoadingHistory: false,
   abortController: null,
@@ -272,6 +275,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       currentActivity: null,
       iterationSummaries: [],
       errorMessage: null,
+      truncationWarning: null,
     });
 
     const abortController = new AbortController();
@@ -462,6 +466,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
 
             case "error":
               set({ errorMessage: event.error || "An error occurred" });
+              break;
+
+            case "truncation_warning":
+              set({ truncationWarning: event.content || null });
               break;
 
             case "done":
@@ -734,6 +742,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
                     set({ errorMessage: event.error });
                   }
                   break;
+                case "truncation_warning":
+                  set({ truncationWarning: event.content || null });
+                  break;
                 case "done":
                   break;
               }
@@ -936,6 +947,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
   },
 
   clearError: () => set({ errorMessage: null }),
+
+  clearTruncationWarning: () => set({ truncationWarning: null }),
 
   retryMessage: (assistantMessageIndex: number) => {
     const { messages, isLoading, sendMessage } = get();
