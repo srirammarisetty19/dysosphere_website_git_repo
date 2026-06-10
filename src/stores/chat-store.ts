@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { create } from "zustand";
-import type { Message, Conversation, NasFileResult } from "@/lib/types";
+import type { Message, MessagePart, Conversation, NasFileResult } from "@/lib/types";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 
 interface ChatState {
@@ -162,6 +162,34 @@ function stripIncompleteImageMarkdown(text: string): string {
   return text.replace(/!\[[^\]]*$/, "").replace(/!\[[^\]]*\]\([^)]*$/, "");
 }
 
+/**
+ * Infer media_type from a browser File object for optimistic rendering.
+ * Maps to the same types the server uses: "image", "document", "audio", "video", "text".
+ */
+function mediaTypeFromFile(file: File): string {
+  const mime = file.type || "";
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("audio/")) return "audio";
+  if (mime.startsWith("video/")) return "video";
+
+  // Extension-based fallback
+  const ext = file.name.includes(".")
+    ? file.name.split(".").pop()?.toLowerCase() || ""
+    : "";
+
+  const docExts = ["pdf", "doc", "docx", "xlsx", "xls", "csv", "ppt", "pptx"];
+  if (docExts.includes(ext)) return "document";
+
+  const codeExts = ["py", "js", "ts", "tsx", "jsx", "dart", "java", "c", "cpp", "h", "rs", "go", "rb", "swift", "kt"];
+  const textExts = ["txt", "md", "json", "xml", "yaml", "yml", "html", "css", "log", "ini", "toml"];
+  if (codeExts.includes(ext) || textExts.includes(ext)) return "text";
+
+  if (mime.startsWith("text/")) return "text";
+  if (mime.includes("pdf") || mime.includes("word") || mime.includes("spreadsheet")) return "document";
+
+  return "document"; // Safe fallback for unknown types
+}
+
 export const useChatStore = create<ChatState>()((set, get) => {
   // ── pagehide: browser close / tab navigate (Google / Claude pattern) ────────
   // Release the SSE connection so the browser can unload cleanly,
@@ -242,7 +270,39 @@ export const useChatStore = create<ChatState>()((set, get) => {
   sendMessage: async (message, options) => {
     const { conversationId, isTemporaryMode, description, messages } = get();
 
-    // Add user message immediately
+    // ── Build optimistic MessageParts from local File objects ─────────
+    // Industry pattern (ChatGPT/Gemini/Claude): show file chips IMMEDIATELY
+    // using local file info (optimistic UI). Server-confirmed data replaces
+    // these after upload finishes.
+    const optimisticParts: MessagePart[] = [];
+
+    if (options?.attachments && options.attachments.length > 0) {
+      for (const file of options.attachments) {
+        optimisticParts.push({
+          type: mediaTypeFromFile(file),
+          filename: file.name,
+          file_url: undefined,  // Will be filled after upload
+          mime_type: file.type || undefined,
+        });
+      }
+    } else if (options?.fileParts && options.fileParts.length > 0) {
+      // Retry path: already have server-confirmed parts
+      for (const fp of options.fileParts) {
+        optimisticParts.push({
+          type: fp.media_type,
+          filename: fp.filename,
+          file_url: fp.file_url,
+          mime_type: fp.mime_type,
+        });
+      }
+    }
+
+    // Add text part if message is not empty
+    if (message.trim()) {
+      optimisticParts.push({ type: "text", content: message });
+    }
+
+    // Add user message immediately with optimistic parts
     const userMessage: Message = {
       role: "user",
       content: message,
@@ -252,7 +312,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       image_urls: [],
       attachments: [],
       nas_files: [],
-      parts: [],
+      parts: optimisticParts.length > 0 ? optimisticParts : [],
     };
 
     // Create placeholder assistant message
@@ -323,10 +383,44 @@ export const useChatStore = create<ChatState>()((set, get) => {
         }
       }
       set({ currentActivity: null });
+
+      // ── Update user message with server-confirmed file parts ──────
+      // Replace optimistic parts (no file_url) with real server data.
+      // This ensures DB-restored messages have correct URLs.
+      if (fileParts.length > 0) {
+        const confirmedParts: MessagePart[] = [];
+        for (const fp of fileParts) {
+          confirmedParts.push({
+            type: fp.media_type,
+            filename: fp.filename,
+            file_url: fp.file_url,
+            mime_type: fp.mime_type,
+          });
+        }
+        if (message.trim()) {
+          confirmedParts.push({ type: "text", content: message });
+        }
+
+        const currentMessages = get().messages;
+        // User message is at index (currentMessages.length - 2)
+        // (assistant placeholder is last)
+        const userMsgIdx = currentMessages.length - 2;
+        if (userMsgIdx >= 0 && currentMessages[userMsgIdx].role === "user") {
+          const updatedUser = { ...currentMessages[userMsgIdx], parts: confirmedParts };
+          set({
+            messages: [
+              ...currentMessages.slice(0, userMsgIdx),
+              updatedUser,
+              ...currentMessages.slice(userMsgIdx + 1),
+            ],
+          });
+        }
+      }
     }
 
     // Build clean message — no text markers
     const finalMessage = documentContext ? documentContext + message : message;
+
 
     let accumulatedContent = "";
     const accumulatedSteps: string[] = [];

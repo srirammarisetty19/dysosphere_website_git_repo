@@ -15,6 +15,11 @@ import {
   FileText,
   Image as ImageIcon,
   ArrowUp,
+  FileCode,
+  FileSpreadsheet,
+  FileAudio,
+  FileVideo,
+  File as FileIcon,
 } from "lucide-react";
 
 interface ChatInputProps {
@@ -104,6 +109,14 @@ export function ChatInput({ onSend, isLoading, onStop }: ChatInputProps) {
 
   const getFileIcon = (file: File) => {
     if (file.type.startsWith("image/")) return <ImageIcon size={12} />;
+    if (file.type.startsWith("audio/")) return <FileAudio size={12} />;
+    if (file.type.startsWith("video/")) return <FileVideo size={12} />;
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (ext === "pdf") return <FileText size={12} className="text-red-400" />;
+    if (["doc", "docx"].includes(ext)) return <FileText size={12} className="text-blue-400" />;
+    if (["xlsx", "xls", "csv"].includes(ext)) return <FileSpreadsheet size={12} className="text-green-400" />;
+    if (["py", "js", "ts", "tsx", "jsx", "dart", "java", "c", "cpp", "h", "rs", "go", "rb", "swift", "kt"].includes(ext)) return <FileCode size={12} className="text-cyan-400" />;
     return <FileText size={12} />;
   };
 
@@ -249,7 +262,7 @@ export function ChatInput({ onSend, isLoading, onStop }: ChatInputProps) {
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*,.pdf,.txt,.csv,.json,.md,.doc,.docx"
+            accept="image/*,audio/*,video/*,.pdf,.txt,.csv,.json,.md,.doc,.docx,.xlsx,.xls,.py,.js,.ts,.tsx,.jsx,.dart,.java,.c,.cpp,.h,.rs,.go,.rb,.swift,.kt,.xml,.yaml,.yml,.html,.css,.log,.ini,.toml,.ppt,.pptx,.wav,.mp3,.m4a"
             onChange={handleFileChange}
             className="hidden"
           />
