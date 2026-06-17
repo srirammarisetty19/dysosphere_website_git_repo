@@ -417,12 +417,15 @@ class ApiClient {
       return "Validation error";
     }
 
-    // Case 3: detail is a single object with msg (edge case)
-    if (detail && typeof detail === "object" && "msg" in (detail as Record<string, unknown>)) {
-      return String((detail as Record<string, unknown>).msg).replace(
-        /^Value error,\s*/i,
-        ""
-      );
+    // Case 3: detail is a single object with msg or message (edge case)
+    if (detail && typeof detail === "object") {
+      const d = detail as Record<string, unknown>;
+      if ("msg" in d && typeof d.msg === "string") {
+        return d.msg.replace(/^Value error,\s*/i, "");
+      }
+      if ("message" in d && typeof d.message === "string") {
+        return d.message;
+      }
     }
 
     // Case 4: top-level message field
