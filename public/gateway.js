@@ -531,20 +531,9 @@
     // Step 2: Service Selection
     function selectService(service) {
       state.selectedService = service;
-      // Update auth step UI to match selected service
-      const logo = document.getElementById('gwAuthLogo');
-      const title = document.getElementById('gwAuthTitle');
-      const subtitle = document.getElementById('gwAuthSubtitle');
-      if (service === 'nas') {
-        logo.textContent = '💾';
-        title.textContent = 'Sign in to SphereX NAS';
-        subtitle.textContent = 'Access your intelligent storage';
-      } else {
-        logo.textContent = '🧠';
-        title.textContent = 'Sign in to SphereX AI';
-        subtitle.textContent = 'Access your private AI assistant';
-      }
-      goToStep(3);
+      try { localStorage.setItem('spherex_service', service); } catch(e) { /* ok */ }
+      // Redirect to the full login page (which links to /register for sign-up)
+      window.location.href = '/login';
     }
 
     document.getElementById('gwServiceAI').addEventListener('click', () => selectService('ai'));
