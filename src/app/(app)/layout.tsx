@@ -45,9 +45,11 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
     if (token && server && username) {
       const email = searchParams.get("email") || "";
       const uid = searchParams.get("uid") || "";
+      const refreshToken = searchParams.get("refresh_token") || undefined;
       const normalizedServer = server.replace(/\/+$/, "");
 
       apiClient.setToken(token);
+      apiClient.setRefreshToken(refreshToken || null);
       apiClient.setServerUrl(normalizedServer);
       try { localStorage.setItem("spherex_server", normalizedServer); } catch { /* ok */ }
 
@@ -57,6 +59,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
         email,
         serverUrl: normalizedServer,
         token,
+        refreshToken,
       };
       useAuthStore.setState({
         user: { id: uid || "gateway", username, email },
@@ -104,6 +107,12 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Wait for auth hydration before running health checks to prevent false offline flash
     if (!_hasHydrated || !user) return;
+
+    // Skip health checks if the access token is already expired.
+    // The force-logout mechanism (visibility handler / request interceptor)
+    // will handle the redirect to login. Hammering the server with
+    // unauthorized health checks would just generate noise.
+    if (apiClient.isTokenExpiredOrExpiringSoon(0)) return;
 
     // Initial check after 500ms (give time for API client to be configured)
     const initialTimer = setTimeout(checkHealth, 500);

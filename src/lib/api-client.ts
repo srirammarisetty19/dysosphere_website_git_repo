@@ -69,13 +69,29 @@ const ROUTE_MAP: Record<string, string> = {
 class ApiClient {
   private token: string | null = null;
   private serverUrl: string | null = null;
+  private refreshToken_: string | null = null;
+
+  // ── Force Logout Callback ────────────────────────────────────────────
+  // Registered by the auth store. Invoked when auth is irrecoverably dead
+  // (401 after refresh failure). Clears Zustand state and redirects.
+  private forceLogoutCallback: (() => void) | null = null;
+
+  // ── Cross-Tab Token Sync (Google BroadcastChannel pattern) ───────────
+  // When one tab refreshes the token, all other tabs receive the new
+  // access + refresh tokens via BroadcastChannel. This prevents the
+  // "refresh token rotation race" where Tab B uses a revoked refresh
+  // token because Tab A already rotated it.
+  private tokenChannel: BroadcastChannel | null = null;
 
   // ── Proactive Token Refresh (Google-style) ───────────────────────────
-  // Schedules a silent background refresh 60 seconds before the JWT exp.
-  // Also re-checks on tab focus (visibilitychange) so long-idle tabs
-  // never hit an expired token on the first action after waking up.
-  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  // Uses a 60-second interval instead of a single long setTimeout.
+  // Browsers throttle/suspend timers in background tabs, making long
+  // setTimeout unreliable (it may fire hours late). A short interval
+  // that checks "is token expiring soon?" is immune to this.
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private visibilityHandler: (() => void) | null = null;
+  // Guard to prevent concurrent refresh attempts across handlers
+  private isRefreshing = false;
 
   // ── Server URL Management ───────────────────────────────────────────
 
@@ -125,6 +141,91 @@ class ApiClient {
     return null;
   }
 
+  // ── Refresh Token Management ────────────────────────────────────────
+
+  setRefreshToken(token: string | null) {
+    this.refreshToken_ = token;
+    if (typeof window !== "undefined") {
+      if (token) {
+        localStorage.setItem("sphere_refresh_token", token);
+      } else {
+        localStorage.removeItem("sphere_refresh_token");
+      }
+    }
+  }
+
+  getRefreshToken(): string | null {
+    if (this.refreshToken_) return this.refreshToken_;
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sphere_refresh_token");
+    }
+    return null;
+  }
+
+  // ── Force Logout Registration ────────────────────────────────────────
+  // Called by the auth store during hydration to wire up the
+  // "unrecoverable 401 → clear state → redirect" circuit.
+  registerForceLogout(callback: () => void): void {
+    this.forceLogoutCallback = callback;
+  }
+
+  // ── BroadcastChannel: Cross-Tab Token Sync (Google pattern) ──────────
+  // Google Workspace apps use BroadcastChannel to synchronize auth state
+  // across all open tabs. When one tab refreshes tokens, it broadcasts
+  // the new pair so other tabs don't race with the (now-revoked) old
+  // refresh token.
+
+  initTokenBroadcast(): void {
+    if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return;
+    if (this.tokenChannel) return; // Already initialized
+
+    this.tokenChannel = new BroadcastChannel("sphere-auth-sync");
+    this.tokenChannel.onmessage = (event) => {
+      const { type, accessToken, refreshToken: rt } = event.data || {};
+
+      if (type === "token-refresh" && accessToken) {
+        // Another tab refreshed — adopt the new tokens silently
+        this.token = accessToken;
+        if (typeof window !== "undefined") {
+          localStorage.setItem("sphere_token", accessToken);
+        }
+        if (rt) {
+          this.refreshToken_ = rt;
+          if (typeof window !== "undefined") {
+            localStorage.setItem("sphere_refresh_token", rt);
+          }
+        }
+        // Reschedule our own refresh timer with the new token's expiry
+        this.scheduleTokenRefresh();
+        // Reconnect WS with fresh token
+        this.reconnectNotificationWebSocketAfterRefresh();
+      } else if (type === "force-logout") {
+        // Another tab triggered force logout — follow suit
+        this.forceLogoutCallback?.();
+      }
+    };
+  }
+
+  private broadcastTokenRefresh(accessToken: string, refreshToken: string | null): void {
+    try {
+      this.tokenChannel?.postMessage({
+        type: "token-refresh",
+        accessToken,
+        refreshToken,
+      });
+    } catch {
+      // BroadcastChannel closed or unavailable — non-critical
+    }
+  }
+
+  private broadcastForceLogout(): void {
+    try {
+      this.tokenChannel?.postMessage({ type: "force-logout" });
+    } catch {
+      // Non-critical
+    }
+  }
+
   // ── JWT Expiry Helpers ───────────────────────────────────────────────
 
   /**
@@ -160,9 +261,18 @@ class ApiClient {
   // ── Proactive Refresh Timer (Google / Slack pattern) ─────────────────
 
   /**
-   * Schedule a background token refresh 60 seconds before the JWT expires.
-   * Also registers a `visibilitychange` listener so a long-idle tab refreshes
-   * the moment the user switches back to it — completely silently.
+   * Start a 60-second interval that checks whether the access token is
+   * approaching expiry. If it will expire within 120 seconds, silently
+   * refresh. Also registers a `visibilitychange` listener for tab-wake
+   * session recovery (Google Drive / Gmail pattern).
+   *
+   * Why setInterval instead of setTimeout?
+   *   Browsers aggressively throttle setTimeout in background tabs
+   *   (Chrome: once per minute, Safari: can suspend entirely). A long
+   *   setTimeout (e.g. 23h59m) will fire much later than expected —
+   *   or not at all before the token expires. A short interval that
+   *   checks expiry is immune to this: even if throttled, it fires at
+   *   most 60s late.
    *
    * Call this after login and after hydration from localStorage.
    */
@@ -175,31 +285,34 @@ class ApiClient {
     const token = this.getToken();
     if (!token) return;
 
-    const exp = this.parseTokenExpiry(token);
-    if (!exp) return;
+    // ── Interval: check every 60s if token needs refresh ────────────────
+    this.refreshTimer = setInterval(async () => {
+      if (this.isRefreshing) return;
+      if (this.isTokenExpiredOrExpiringSoon(120)) {
+        await this.tryRefreshToken();
+      }
+    }, 60_000);
 
-    const nowSec = Math.floor(Date.now() / 1000);
-    const secondsUntilExpiry = exp - nowSec;
-
-    // Refresh 60 seconds before expiry (minimum 5s to avoid hammering if already near)
-    const refreshInMs = Math.max(5_000, (secondsUntilExpiry - 60) * 1000);
-
-    this.refreshTimer = setTimeout(async () => {
-      await this.tryRefreshToken();
-      // Reschedule after refresh so the cycle continues
-      this.scheduleTokenRefresh();
-    }, refreshInMs);
-
-    // ── visibilitychange: re-check when tab becomes active ──────────────
-    // Matches exactly what Slack and Notion do: silently re-validate the
-    // token whenever the user returns to the tab after being away.
+    // ── visibilitychange: session recovery on tab wake ──────────────────
+    // Google Drive/Gmail pattern: when the user returns to the tab after
+    // hours of inactivity, immediately validate the session. Don't just
+    // check the JWT math — the refresh token may also be revoked.
     if (!this.visibilityHandler) {
       this.visibilityHandler = async () => {
-        if (document.visibilityState === "visible") {
-          if (this.isTokenExpiredOrExpiringSoon(60)) {
-            await this.tryRefreshToken();
-            this.scheduleTokenRefresh();
+        if (document.visibilityState !== "visible") return;
+        if (this.isRefreshing) return;
+
+        if (this.isTokenExpiredOrExpiringSoon(0)) {
+          // Access token already expired — must refresh
+          const refreshed = await this.tryRefreshToken();
+          if (!refreshed) {
+            // Both tokens dead — force logout (Google pattern)
+            this.broadcastForceLogout();
+            this.forceLogoutCallback?.();
           }
+        } else if (this.isTokenExpiredOrExpiringSoon(120)) {
+          // Expiring soon — proactively refresh
+          await this.tryRefreshToken();
         }
       };
       document.addEventListener("visibilitychange", this.visibilityHandler);
@@ -212,7 +325,7 @@ class ApiClient {
    */
   cancelTokenRefreshTimer(): void {
     if (this.refreshTimer !== null) {
-      clearTimeout(this.refreshTimer);
+      clearInterval(this.refreshTimer);
       this.refreshTimer = null;
     }
     if (this.visibilityHandler && typeof window !== "undefined") {
@@ -266,6 +379,66 @@ class ApiClient {
     return this.resolveUrl(`/api${path.startsWith('/') ? path : `/${path}`}`);
   }
 
+  // ── Error Message Extraction (Bulletproof) ─────────────────────────
+  //
+  // FastAPI/Pydantic can return errors in several shapes:
+  //   1. {detail: "string"}                      — simple error
+  //   2. {detail: [{loc, msg, type}, ...]}       — 422 validation errors (array)
+  //   3. {detail: {msg: "string", ...}}          — single validation error (object)
+  //   4. {message: "string"}                     — generic error
+  //   5. Anything else                           — use fallback
+  //
+  // This method handles ALL cases and NEVER produces "[object Object]".
+
+  private extractErrorMessage(
+    errorData: Record<string, unknown>,
+    fallback: string
+  ): string {
+    const detail = errorData.detail;
+
+    // Case 1: detail is a plain string (most common for HTTPException)
+    if (typeof detail === "string") {
+      return detail;
+    }
+
+    // Case 2: detail is an array of validation errors (FastAPI 422)
+    if (Array.isArray(detail) && detail.length > 0) {
+      // Extract msg from each error, strip "Value error, " prefix, join with ". "
+      const messages = detail
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (item && typeof item === "object" && "msg" in item) {
+            return String(item.msg).replace(/^Value error,\s*/i, "");
+          }
+          return null;
+        })
+        .filter(Boolean);
+      if (messages.length > 0) return messages.join(". ");
+      return "Validation error";
+    }
+
+    // Case 3: detail is a single object with msg (edge case)
+    if (detail && typeof detail === "object" && "msg" in (detail as Record<string, unknown>)) {
+      return String((detail as Record<string, unknown>).msg).replace(
+        /^Value error,\s*/i,
+        ""
+      );
+    }
+
+    // Case 4: top-level message field
+    if (typeof errorData.message === "string") {
+      return errorData.message;
+    }
+
+    // Case 5: detail exists but is some other type — safe stringify
+    if (detail !== undefined && detail !== null) {
+      const str = String(detail);
+      if (str && str !== "[object Object]") return str;
+    }
+
+    return fallback;
+  }
+
   // ── Core Fetch Wrapper ──────────────────────────────────────────────
 
   private async request<T>(
@@ -310,6 +483,12 @@ class ApiClient {
         }
         return retryResponse.json();
       }
+      // Refresh failed — session is irrecoverably dead.
+      // Force logout: clear auth state and redirect to login.
+      // This prevents the "zombie session" where the user sees
+      // the chat screen but all API calls silently fail.
+      this.broadcastForceLogout();
+      this.forceLogoutCallback?.();
       throw new ApiClientError("Session expired. Please sign in again.", 401);
     }
 
@@ -317,16 +496,7 @@ class ApiClient {
       let errorMessage: string;
       try {
         const errorData = await response.json();
-        const detail = errorData.detail;
-        if (typeof detail === "string") {
-          errorMessage = detail;
-        } else if (Array.isArray(detail) && detail.length > 0) {
-          // FastAPI 422 validation error: detail is [{loc, msg, type}]
-          const msg = detail[0]?.msg ?? "Validation error";
-          errorMessage = msg.replace(/^Value error,\s*/i, "");
-        } else {
-          errorMessage = errorData.message ?? response.statusText;
-        }
+        errorMessage = this.extractErrorMessage(errorData, response.statusText);
       } catch {
         errorMessage = response.statusText;
       }
@@ -342,31 +512,87 @@ class ApiClient {
   }
 
   private async tryRefreshToken(): Promise<boolean> {
+    // Guard against concurrent refresh attempts (e.g. interval + visibility
+    // handler firing at the same time). Google uses a similar mutex.
+    if (this.isRefreshing) return false;
+    this.isRefreshing = true;
+
     try {
-      const token = this.getToken();
-      if (!token) return false;
+      const refreshTok = this.getRefreshToken();
+      if (!refreshTok) return false;
 
       const url = this.resolveUrl("/api/auth/refresh");
 
+      // The server expects a JSON body with the refresh token — NOT a Bearer
+      // header with the access token. The NAS server validates the refresh
+      // token hash against its database and issues a new access + refresh
+      // token pair (rotation).
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ refresh_token: refreshTok }),
       });
 
       if (response.ok) {
-        const data: AuthResponse = await response.json();
-        this.setToken(data.access_token);
-        // Reconnect notification WebSocket with fresh token (Google/Slack pattern)
+        const data = await response.json();
+        const newAccessToken = data.access_token || "";
+        const newRefreshToken = data.refresh_token || null;
+
+        this.setToken(newAccessToken);
+        // Store the rotated refresh token (NAS revokes the old one)
+        this.setRefreshToken(newRefreshToken);
+
+        // Sync the new tokens to the Zustand auth store so they
+        // persist across page reloads via localStorage.
+        this.syncRefreshTokenToStore(newAccessToken, newRefreshToken);
+
+        // Broadcast to other tabs (Google BroadcastChannel pattern)
+        this.broadcastTokenRefresh(newAccessToken, newRefreshToken);
+
+        // Reconnect notification WebSocket with fresh token
         this.reconnectNotificationWebSocketAfterRefresh();
         return true;
       }
     } catch {
-      // Refresh failed
+      // Refresh failed — network error or server down
+    } finally {
+      this.isRefreshing = false;
     }
     return false;
+  }
+
+  /**
+   * Sync refreshed tokens back to the Zustand auth store so they persist
+   * in localStorage via the `persist` middleware. Without this, a page
+   * reload after a silent refresh would revert to the old (revoked) tokens.
+   */
+  private syncRefreshTokenToStore(accessToken: string, refreshToken: string | null): void {
+    // Dynamically import to avoid circular dependency at module level.
+    // This is the standard pattern for singletons that need store access.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { useAuthStore } = require("@/stores/auth-store");
+      const state = useAuthStore.getState();
+      if (state.activeAccount) {
+        useAuthStore.setState({
+          activeAccount: {
+            ...state.activeAccount,
+            token: accessToken,
+            refreshToken: refreshToken || undefined,
+          },
+          // Also update the account in the accounts list
+          accounts: state.accounts.map((a: { id: string; token: string; refreshToken?: string }) =>
+            a.id === state.activeAccount!.id
+              ? { ...a, token: accessToken, refreshToken: refreshToken || undefined }
+              : a
+          ),
+        });
+      }
+    } catch {
+      // Store not available (SSR) — non-critical
+    }
   }
 
   // ── Auth Endpoints ──────────────────────────────────────────────────
@@ -377,6 +603,7 @@ class ApiClient {
       body: JSON.stringify({ username, password }),
     });
     this.setToken(data.access_token);
+    this.setRefreshToken(data.refresh_token || null);
     return data;
   }
 
@@ -390,6 +617,7 @@ class ApiClient {
       body: JSON.stringify({ username, email, password }),
     });
     this.setToken(data.access_token);
+    this.setRefreshToken(data.refresh_token || null);
     return data;
   }
 
@@ -398,6 +626,7 @@ class ApiClient {
       await this.request("/api/auth/logout", { method: "POST" });
     } finally {
       this.setToken(null);
+      this.setRefreshToken(null);
     }
   }
 
@@ -659,7 +888,7 @@ class ApiClient {
       let errorMessage: string;
       try {
         const errorData = await response.json();
-        errorMessage = errorData.detail || response.statusText;
+        errorMessage = this.extractErrorMessage(errorData, response.statusText);
       } catch {
         errorMessage = response.statusText;
       }

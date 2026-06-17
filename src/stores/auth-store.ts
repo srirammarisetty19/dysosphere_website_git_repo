@@ -63,7 +63,11 @@ export const useAuthStore = create<AuthState>()(
             email: profile.email || "",
             serverUrl,
             token,
+            refreshToken: data.refresh_token || undefined,
           };
+
+          // Store the refresh token in the API client for silent refresh
+          apiClient.setRefreshToken(data.refresh_token || null);
 
           const { accounts } = get();
           const updatedAccounts = [
@@ -105,7 +109,11 @@ export const useAuthStore = create<AuthState>()(
             email,
             serverUrl,
             token,
+            refreshToken: data.refresh_token || undefined,
           };
+
+          // Store the refresh token in the API client for silent refresh
+          apiClient.setRefreshToken(data.refresh_token || null);
 
           const { accounts } = get();
           const updatedAccounts = [
@@ -154,6 +162,7 @@ export const useAuthStore = create<AuthState>()(
           // Switch to next account
           const next = remaining[0];
           apiClient.setToken(next.token);
+          apiClient.setRefreshToken(next.refreshToken || null);
           apiClient.setServerUrl(next.serverUrl);
           set({
             activeAccount: next,
@@ -169,6 +178,7 @@ export const useAuthStore = create<AuthState>()(
             accounts: [],
           });
           apiClient.setToken(null);
+          apiClient.setRefreshToken(null);
           apiClient.setServerUrl(null);
         }
       },
@@ -193,6 +203,7 @@ export const useAuthStore = create<AuthState>()(
           accounts: [],
         });
         apiClient.setToken(null);
+        apiClient.setRefreshToken(null);
         apiClient.setServerUrl(null);
       },
 
@@ -207,6 +218,7 @@ export const useAuthStore = create<AuthState>()(
 
       switchAccount: (account) => {
         apiClient.setToken(account.token);
+        apiClient.setRefreshToken(account.refreshToken || null);
         apiClient.setServerUrl(account.serverUrl);
         set({
           activeAccount: account,
@@ -254,6 +266,7 @@ export const useAuthStore = create<AuthState>()(
 
       clearAuth: () => {
         apiClient.setToken(null);
+        apiClient.setRefreshToken(null);
         apiClient.setServerUrl(null);
         // Stop the background refresh timer
         apiClient.cancelTokenRefreshTimer();
@@ -288,6 +301,9 @@ export const useAuthStore = create<AuthState>()(
           if (state.activeAccount.token) {
             apiClient.setToken(state.activeAccount.token);
           }
+          if (state.activeAccount.refreshToken) {
+            apiClient.setRefreshToken(state.activeAccount.refreshToken);
+          }
           if (state.activeAccount.serverUrl) {
             apiClient.setServerUrl(state.activeAccount.serverUrl);
           }
@@ -298,6 +314,21 @@ export const useAuthStore = create<AuthState>()(
         // We set it regardless of errors so the UI never stays frozen.
         queueMicrotask(() => {
           useAuthStore.setState({ _hasHydrated: true });
+
+          // Register the force-logout callback so the API client can
+          // clear auth state and redirect on unrecoverable 401.
+          // This is the Google pattern: API layer signals auth death → UI
+          // clears state and redirects without user action.
+          apiClient.registerForceLogout(() => {
+            useAuthStore.getState().clearAuth();
+            if (typeof window !== "undefined") {
+              window.location.href = "/login";
+            }
+          });
+
+          // Initialize BroadcastChannel for cross-tab token sync (Google pattern)
+          apiClient.initTokenBroadcast();
+
           // Start proactive token refresh now that we have the token from storage.
           // This is exactly what Google does on page load: check JWT exp and
           // schedule a silent refresh before it expires.

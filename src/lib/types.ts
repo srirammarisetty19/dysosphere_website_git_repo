@@ -8,6 +8,7 @@
 
 export interface AuthResponse {
   access_token: string;
+  refresh_token?: string;
   token_type: string;
 }
 
@@ -37,6 +38,7 @@ export interface Account {
   email: string;
   serverUrl: string;
   token: string;
+  refreshToken?: string;
 }
 
 // ── Chat / Conversations ────────────────────────────────────────────────
