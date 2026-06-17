@@ -72,7 +72,7 @@ export default function SettingsPage() {
           <button
             onClick={() => {
               logout();
-              router.push("/login");
+              router.replace("/login");
             }}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500/8 border border-red-500/15 text-red-400 text-sm font-medium hover:bg-red-500/15 transition-colors"
           >
@@ -745,7 +745,7 @@ function DeleteAccountSection() {
     try {
       await apiClient.deleteAccount();
       logout();
-      router.push("/login");
+      router.replace("/login");
     } catch {
       setLoading(false);
     }

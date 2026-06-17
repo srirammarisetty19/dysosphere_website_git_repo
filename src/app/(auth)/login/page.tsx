@@ -296,6 +296,14 @@ function LoginPageInner() {
           Sign up
         </Link>
       </p>
+
+      {/* Back to Services */}
+      <a
+        href="/"
+        className="mt-3 text-white/20 text-[12px] hover:text-white/40 transition-colors inline-flex items-center gap-1.5"
+      >
+        ← Back to Services
+      </a>
     </div>
   );
 }

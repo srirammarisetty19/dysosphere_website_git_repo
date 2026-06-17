@@ -133,7 +133,7 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (_hasHydrated && !user) {
-      router.push("/login");
+      router.replace("/login");
     }
   }, [_hasHydrated, user, router]);
 
