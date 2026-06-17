@@ -6,7 +6,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { User, Mail, Lock, Eye, EyeOff, AlertCircle, Loader2, CheckCircle2, Circle } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
@@ -59,7 +59,12 @@ function PasswordRequirement({ label, met }: { label: string; met: boolean }) {
 // ── Main Component ───────────────────────────────────────────────────────────
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { register, isLoading, error, setError, user, _hasHydrated } = useAuthStore();
+
+  // Determine post-auth redirect based on ?service= param from gateway
+  const service = searchParams.get("service");
+  const redirectPath = service === "nas" ? "/nas" : "/chat";
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -86,7 +91,7 @@ export default function RegisterPage() {
   // If user is already authenticated, redirect to chat
   useEffect(() => {
     if (_hasHydrated && user) {
-      router.push("/chat");
+      router.push(redirectPath);
     }
   }, [_hasHydrated, user, router]);
 
@@ -124,7 +129,7 @@ export default function RegisterPage() {
 
     try {
       await register(username.trim(), email.trim(), password);
-      router.push("/chat");
+      router.push(redirectPath);
     } catch {
       // Error already set by store
     }
@@ -315,7 +320,7 @@ export default function RegisterPage() {
       <p className="mt-7 text-white/30 text-[13px]">
         Already have an account?{" "}
         <Link
-          href="/login"
+          href={service ? `/login?service=${service}` : "/login"}
           className="text-[var(--color-accent-teal)] font-semibold hover:underline"
         >
           Sign in

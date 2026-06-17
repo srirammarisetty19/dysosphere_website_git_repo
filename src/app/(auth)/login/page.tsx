@@ -10,7 +10,7 @@
 // ============================================================================
 
 import { useState, useEffect, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, User, Lock, AlertCircle, Loader2, Globe } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
@@ -19,7 +19,12 @@ import { DSLogo } from "@/components/ui/ds-logo";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, isLoading, error, setError, user, _hasHydrated } = useAuthStore();
+
+  // Determine post-auth redirect based on ?service= param from gateway
+  const service = searchParams.get("service");
+  const redirectPath = service === "nas" ? "/nas" : "/chat";
 
   const [serverUrl, setServerUrlInput] = useState("");
   const [username, setUsername] = useState("");
@@ -40,7 +45,7 @@ export default function LoginPage() {
   // If user is already authenticated (e.g. via gateway), redirect to chat
   useEffect(() => {
     if (_hasHydrated && user) {
-      router.push("/chat");
+      router.push(redirectPath);
     }
   }, [_hasHydrated, user, router]);
 
@@ -104,7 +109,7 @@ export default function LoginPage() {
 
     try {
       await login(username.trim(), password.trim());
-      router.push("/chat");
+      router.push(redirectPath);
     } catch {
       // Error already set by store
     }
@@ -285,7 +290,7 @@ export default function LoginPage() {
       <p className="mt-7 text-white/30 text-[13px]">
         Don&apos;t have an account?{" "}
         <Link
-          href="/register"
+          href={service ? `/register?service=${service}` : "/register"}
           className="text-[var(--color-accent-teal)] font-semibold hover:underline"
         >
           Sign up

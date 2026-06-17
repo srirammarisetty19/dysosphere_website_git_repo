@@ -533,7 +533,7 @@
       state.selectedService = service;
       try { localStorage.setItem('spherex_service', service); } catch(e) { /* ok */ }
       // Redirect to the full login page (which links to /register for sign-up)
-      window.location.href = '/login';
+      window.location.href = `/login?service=${service}`;
     }
 
     document.getElementById('gwServiceAI').addEventListener('click', () => selectService('ai'));
