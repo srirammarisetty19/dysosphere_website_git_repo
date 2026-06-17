@@ -5,7 +5,7 @@
 // Password rules: min 8 chars + letter + number + special character
 // ============================================================================
 
-import { useState, useEffect, useCallback, type FormEvent } from "react";
+import { useState, useEffect, useCallback, Suspense, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { User, Mail, Lock, Eye, EyeOff, AlertCircle, Loader2, CheckCircle2, Circle } from "lucide-react";
@@ -57,7 +57,7 @@ function PasswordRequirement({ label, met }: { label: string; met: boolean }) {
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
-export default function RegisterPage() {
+function RegisterPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register, isLoading, error, setError, user, _hasHydrated } = useAuthStore();
@@ -327,5 +327,13 @@ export default function RegisterPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterPageInner />
+    </Suspense>
   );
 }

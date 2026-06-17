@@ -9,7 +9,7 @@
 //   2. Direct visit — user enters server URL here (like the mobile app)
 // ============================================================================
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, Suspense, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, User, Lock, AlertCircle, Loader2, Globe } from "lucide-react";
@@ -17,7 +17,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { apiClient } from "@/lib/api-client";
 import { DSLogo } from "@/components/ui/ds-logo";
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isLoading, error, setError, user, _hasHydrated } = useAuthStore();
@@ -297,5 +297,13 @@ export default function LoginPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageInner />
+    </Suspense>
   );
 }
