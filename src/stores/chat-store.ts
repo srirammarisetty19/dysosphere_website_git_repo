@@ -193,6 +193,14 @@ function mediaTypeFromFile(file: File): string {
   return "document"; // Safe fallback for unknown types
 }
 
+// ── Generation ID Guard (Gemini/ChatGPT pattern) ──────────────────────────
+// Monotonically increasing counter. Incremented on every newChat / loadConversation /
+// stopGeneration. The streaming loop captures the value at start and checks before
+// every set() call. If the ID changed (user opened a new chat mid-stream), writes
+// are silently dropped — eliminating the stale-closure leak where old responses
+// appear in the new chat.
+let _generationId = 0;
+
 export const useChatStore = create<ChatState>()((set, get) => {
   // ── pagehide: browser close / tab navigate (Google / Claude pattern) ────────
   // Release the SSE connection so the browser can unload cleanly,
@@ -342,6 +350,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
       truncationWarning: null,
     });
 
+    // ── Mint generation ID for this request ────────────────────────────
+    _generationId++;
+    const myGeneration = _generationId;
+
     const abortController = new AbortController();
     set({ abortController });
 
@@ -477,6 +489,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
 
         for await (const event of stream) {
           if (abortController.signal.aborted) break;
+          // ── Generation ID guard: drop writes from stale streams ──────
+          if (_generationId !== myGeneration) break;
           hasReceivedData = true;
 
           switch (event.type) {
@@ -484,9 +498,16 @@ export const useChatStore = create<ChatState>()((set, get) => {
               accumulatedContent += event.content || "";
               break;
 
-            case "thinking":
-              accumulatedContent += event.content || "";
+            case "thinking": {
+              // Server emits consolidated reasoning at end of turn.
+              // Inject as <think> block so parseStructuredContent() routes
+              // it to the thinking section, NOT the visible response.
+              const thinkContent = event.content || "";
+              if (thinkContent && !accumulatedContent.includes("<think>")) {
+                accumulatedContent = `<think>\n${thinkContent}\n</think>\n${accumulatedContent}`;
+              }
               break;
+            }
 
             case "session":
               sessionId = event.session_id || sessionId;
@@ -579,6 +600,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
           }
 
           // Update the assistant message in place
+          // Guard: only write if this generation is still current
+          if (_generationId !== myGeneration) break;
           const currentMessages = get().messages;
           const parsed = parseStructuredContent(accumulatedContent);
           const displayContent = get().isLoading
@@ -643,6 +666,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
       }
     } // end while
     } finally {
+      // Only finalize if this generation is still current.
+      // If user opened a new chat mid-stream, the new chat manages its own state.
+      if (_generationId !== myGeneration) return;
+
       // Finalize: clean the content and compute thinking duration
       const finalMessages = get().messages;
       const lastMsg = finalMessages[finalMessages.length - 1];
@@ -683,6 +710,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
 
   stopGeneration: () => {
     const { abortController, conversationId } = get();
+    _generationId++; // Invalidate any in-flight stream
     if (abortController) {
       abortController.abort();
       // User explicitly pressed Stop — cancel the server run
@@ -721,11 +749,17 @@ export const useChatStore = create<ChatState>()((set, get) => {
   },
 
   loadConversation: async (conversationId) => {
+    // Abort any active stream and invalidate stale writes
+    const { abortController: existingController } = get();
+    if (existingController) existingController.abort();
+    _generationId++;
+    const myGeneration = _generationId;
+
     // Use isLoadingHistory (not isLoading) to avoid triggering streaming UI
     // on the last assistant message. isLoading is only set when actually
     // resuming an active run. This matches the Flutter pattern and prevents
     // the 3-second "thinking" flash on conversation reload.
-    set({ isLoadingHistory: true, errorMessage: null });
+    set({ isLoadingHistory: true, errorMessage: null, abortController: null });
     try {
       const data = await apiClient.getConversation(conversationId);
       // Normalize server roles to UI roles and group blocks into turns
@@ -795,6 +829,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
 
             for await (const event of stream) {
               if (abortController.signal.aborted) break;
+              // ── Generation ID guard ──────────────────────────────────
+              if (_generationId !== myGeneration) break;
 
               switch (event.type) {
                 case "token":
@@ -852,6 +888,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
               }
 
               // Update assistant message in place
+              // Guard: only write if generation is still current
+              if (_generationId !== myGeneration) break;
               const msgs = get().messages;
               const parsed = parseStructuredContent(accumulatedContent);
               const displayContent = get().isLoading
@@ -892,6 +930,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
               // Silent — keep whatever we have
             }
           } finally {
+            // Only finalize if generation is still current
+            if (_generationId !== myGeneration) return;
+
             // Finalize: compute thinking duration and clear loading state
             const finalMessages = get().messages;
             const lastMsg = finalMessages[finalMessages.length - 1];
@@ -944,6 +985,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
   },
 
   newChat: (temporary = false, desc) => {
+    // Stop any active generation and invalidate stale streams
+    const { abortController } = get();
+    if (abortController) abortController.abort();
+    _generationId++; // Invalidate any in-flight stream
     set({
       conversationId: null,
       currentTitle: null,
@@ -955,6 +1000,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       currentActivity: null,
       iterationSummaries: [],
       errorMessage: null,
+      abortController: null,
     });
   },
 

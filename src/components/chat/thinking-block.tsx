@@ -40,9 +40,25 @@ export function ThinkingBlock({
   iterationSummaries,
   streamStartedAt,
 }: ThinkingBlockProps) {
-  const [expanded, setExpanded] = useState(false);
+  // Auto-expand during streaming (Gemini pattern: show reasoning in real-time),
+  // auto-collapse when done (clean "Thought for Xs" summary).
+  // User can always toggle manually by tapping the header.
+  const [expanded, setExpanded] = useState(isStreaming);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const wasStreamingRef = useRef(isStreaming);
+
+  // Auto-expand/collapse when streaming state changes
+  useEffect(() => {
+    if (isStreaming && !wasStreamingRef.current) {
+      // Streaming just started — auto-expand so reasoning is visible
+      setExpanded(true);
+    } else if (!isStreaming && wasStreamingRef.current) {
+      // Streaming just ended — auto-collapse to show clean summary
+      setExpanded(false);
+    }
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming]);
 
   // Elapsed timer
   useEffect(() => {
