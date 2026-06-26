@@ -14,7 +14,7 @@
   font-size: .88rem;
   font-family: var(--font);
   color: #fff;
-  background: linear-gradient(135deg, #3476FC 0%, #7c3aed 100%);
+  background: #3476FC;
   border: none;
   cursor: pointer;
   transition: all .3s ease;
@@ -141,7 +141,7 @@
   width: 52px;
   height: 52px;
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(52,118,252,0.12), rgba(124,61,237,0.12));
+  background: rgba(52,118,252,0.10);
   border: 1px solid rgba(52,118,252,0.2);
   display: flex;
   align-items: center;
@@ -240,9 +240,9 @@
   overflow: hidden;
 }
 .gw-btn-primary {
-  background: linear-gradient(135deg, #3476FC 0%, #7c3aed 100%);
+  background: #3476FC;
   color: #fff;
-  box-shadow: 0 4px 20px rgba(52,118,252,0.3);
+  box-shadow: 0 4px 20px rgba(52,118,252,0.25);
 }
 .gw-btn-primary:hover {
   transform: translateY(-1px);
@@ -358,7 +358,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, #3476FC, #a855f7);
+  background: #3476FC;
   opacity: 0;
   transition: opacity .3s;
 }
@@ -398,8 +398,8 @@
   border: 1px solid rgba(52,118,252,0.2);
 }
 .gw-service-card:last-child .gw-service-icon {
-  background: linear-gradient(135deg, rgba(168,85,247,0.12), rgba(244,114,182,0.12));
-  border: 1px solid rgba(168,85,247,0.15);
+  background: rgba(52,118,252,0.08);
+  border: 1px solid rgba(52,118,252,0.12);
 }
 
 .gw-service-card h3 {
@@ -426,9 +426,9 @@
   font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  background: rgba(168,85,247,0.1);
-  border: 1px solid rgba(168,85,247,0.2);
-  color: #a855f7;
+  background: rgba(52,118,252,0.08);
+  border: 1px solid rgba(52,118,252,0.18);
+  color: var(--brand-light, #5B9AFF);
   margin-top: 10px;
 }
 
@@ -698,7 +698,7 @@
   height: 48px;
   border: 3px solid rgba(255,255,255,0.06);
   border-top-color: #3476FC;
-  border-right-color: #7c3aed;
+  border-right-color: #3476FC;
   border-radius: 50%;
   animation: gw-spin 0.9s linear infinite;
 }

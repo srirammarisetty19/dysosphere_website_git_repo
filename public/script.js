@@ -71,54 +71,8 @@ document.querySelectorAll('.reveal').forEach((el, i) => {
   revealObserver.observe(el);
 });
 
-// ── Hero particles canvas (Home page) ────────────────────
-const pEl = document.getElementById('particles');
-if (pEl) {
-  const c = document.createElement('canvas');
-  const ctx = c.getContext('2d');
-  pEl.appendChild(c);
-  c.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0';
 
-  const resize = () => { c.width = c.offsetWidth; c.height = c.offsetHeight; };
-  resize();
-  window.addEventListener('resize', resize);
 
-  const pts = Array.from({ length: 50 }, () => ({
-    x: Math.random() * c.width,
-    y: Math.random() * c.height,
-    r: Math.random() * 1.5 + 0.4,
-    dx: (Math.random() - 0.5) * 0.25,
-    dy: (Math.random() - 0.5) * 0.25,
-    o: Math.random() * 0.35 + 0.08,
-  }));
-
-  (function draw() {
-    ctx.clearRect(0, 0, c.width, c.height);
-    pts.forEach(p => {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(52,118,252,${p.o})`;
-      ctx.fill();
-      p.x += p.dx; p.y += p.dy;
-      if (p.x < 0 || p.x > c.width) p.dx *= -1;
-      if (p.y < 0 || p.y > c.height) p.dy *= -1;
-    });
-    for (let i = 0; i < pts.length; i++) {
-      for (let j = i + 1; j < pts.length; j++) {
-        const d = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
-        if (d < 120) {
-          ctx.beginPath();
-          ctx.moveTo(pts[i].x, pts[i].y);
-          ctx.lineTo(pts[j].x, pts[j].y);
-          ctx.strokeStyle = `rgba(52,118,252,${0.05 * (1 - d / 120)})`;
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
-        }
-      }
-    }
-    requestAnimationFrame(draw);
-  })();
-}
 
 // ── Active nav link highlight ────────────────────────────
 const currentPage = window.location.pathname.split('/').pop() || 'index.html';
