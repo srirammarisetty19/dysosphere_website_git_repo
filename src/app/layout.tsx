@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "Sphere AI — DysoSphere",
   description:
     "Sphere AI is your private, on-premises AI assistant powered by DysoSphere's SphereX. Chat, search, and automate — entirely on your hardware.",
-  icons: { icon: "/favicon.svg" },
+  icons: { icon: "/DS.svg" },
 };
 
 export default function RootLayout({
