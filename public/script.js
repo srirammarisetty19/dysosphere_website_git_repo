@@ -84,3 +84,79 @@ document.querySelectorAll('.nav-links a:not(.nav-cta)').forEach(link => {
     link.classList.remove('active');
   }
 });
+
+// ── Hero rotating word animation ─────────────────────────
+const heroRotate = document.getElementById('heroRotate');
+if (heroRotate) {
+  const words = heroRotate.querySelectorAll('.rotate-text');
+  let currentWord = 0;
+  
+  // Measure the widest word and set container width
+  let maxWidth = 0;
+  words.forEach(w => {
+    w.style.position = 'relative';
+    w.style.opacity = '1';
+    const rect = w.getBoundingClientRect();
+    if (rect.width > maxWidth) maxWidth = rect.width;
+    w.style.position = '';
+    w.style.opacity = '';
+  });
+  heroRotate.style.width = maxWidth + 'px';
+  heroRotate.style.display = 'inline-block';
+  
+  setInterval(() => {
+    const prev = currentWord;
+    currentWord = (currentWord + 1) % words.length;
+    
+    words[prev].classList.remove('active');
+    words[prev].classList.add('exit');
+    
+    setTimeout(() => {
+      words[prev].classList.remove('exit');
+    }, 450);
+    
+    words[currentWord].classList.add('active');
+  }, 2500);
+}
+
+// ── Animated stats counter ───────────────────────────────
+const statItems = document.querySelectorAll('.stat-item[data-count-type]');
+if (statItems.length) {
+  const statsObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && !entry.target.classList.contains('counted')) {
+        entry.target.classList.add('counted');
+        const type = entry.target.dataset.countType;
+        const numberEl = entry.target.querySelector('.stat-number');
+        
+        if (type === 'number') {
+          const target = parseInt(entry.target.dataset.countTarget, 10);
+          const suffix = entry.target.dataset.countSuffix || '';
+          const duration = 1800;
+          const startTime = performance.now();
+          
+          const animate = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            // Ease out cubic
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const current = Math.round(target * eased);
+            numberEl.textContent = current + suffix;
+            if (progress < 1) requestAnimationFrame(animate);
+          };
+          requestAnimationFrame(animate);
+        } else if (type === 'pulse') {
+          // Quick scale pulse effect
+          numberEl.style.transition = 'transform 0.4s ease';
+          numberEl.style.transform = 'scale(1.2)';
+          setTimeout(() => {
+            numberEl.style.transform = 'scale(1)';
+          }, 400);
+        }
+        // 'static' type: no animation needed, just show label
+      }
+    });
+  }, { threshold: 0.3 });
+  
+  statItems.forEach(item => statsObserver.observe(item));
+}

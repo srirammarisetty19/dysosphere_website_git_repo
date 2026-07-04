@@ -45,11 +45,17 @@
         <div class="hero-scan"></div>
         <div class="hero-content">
             <div class="hero-badge animate-in"><span class="badge-dot"></span>Zero Cloud &bull; Zero Recurring Cost &bull; Total Data Sovereignty</div>
-            <h1 class="hero-title animate-in d1">Your Data. Your AI.<br>Your <span class="gradient-text">Infrastructure.</span></h1>
+            <h1 class="hero-title animate-in d1">Your Data. Your AI.<br>Your <span class="hero-rotate-word" id="heroRotate"><span class="rotate-text active">Infrastructure.</span><span class="rotate-text">Privacy.</span><span class="rotate-text">Intelligence.</span><span class="rotate-text">Sovereignty.</span></span><span class="hero-rotate-cursor"></span></h1>
             <p class="hero-subtitle animate-in d2">SphereX is the world's first neural-accelerated NAS — a single appliance that delivers enterprise-grade AI inference and petabyte-scale storage, entirely on your premises. No cloud dependency. No recurring fees. No compromises.</p>
             <div class="hero-actions animate-in d3">
                 <a href="contact.html" class="btn btn-primary btn-lg">Deploy SphereX</a>
                 <a href="#value" class="btn btn-ghost btn-lg">See the Value ↓</a>
+            </div>
+            <div class="hero-trust-badges">
+                <div class="trust-badge-item"><span class="trust-badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5"/></svg></span>Zero Cloud Dependency</div>
+                <div class="trust-badge-item"><span class="trust-badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5"/></svg></span>HIPAA-Ready</div>
+                <div class="trust-badge-item"><span class="trust-badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5"/></svg></span>On-Premises Only</div>
+                <div class="trust-badge-item"><span class="trust-badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5"/></svg></span>No API Fees</div>
             </div>
             <div class="animate-in d4 dual-chat-demos">
                 <!-- Enterprise Demo -->
@@ -113,7 +119,7 @@
     <section class="workflows" id="value">
         <div class="container">
             <div class="section-header">
-                <span class="section-tag">Core Capabilities</span>
+                <span class="section-tag section-tag--purple">Core Capabilities</span>
                 <h2 class="section-title">One Appliance. <span class="gradient-text">Three Paradigm Shifts.</span></h2>
                 <p class="section-subtitle">SphereX isn't just a NAS with AI bolted on. It's a fundamentally new category — sovereign intelligence infrastructure.</p>
             </div>
@@ -165,7 +171,7 @@
     <section class="why-section" id="why">
         <div class="container">
             <div class="section-header">
-                <span class="section-tag">Why SphereX</span>
+                <span class="section-tag section-tag--green">Why SphereX</span>
                 <h2 class="section-title">The Business Case for <span class="gradient-text">Sovereign Infrastructure</span></h2>
                 <p class="section-subtitle">Every organization faces the same question: trust someone else with your data, or own your intelligence stack.</p>
             </div>
@@ -184,23 +190,23 @@
     <section class="stats-section">
         <div class="container">
             <div class="section-header">
-                <span class="section-tag">By The Numbers</span>
+                <span class="section-tag section-tag--amber">By The Numbers</span>
                 <h2 class="section-title">The ROI of <span class="gradient-text">Owning Your Stack</span></h2>
             </div>
             <div class="stats-grid">
-                <div class="stat-item reveal">
+                <div class="stat-item reveal" data-count-target="$0/mo" data-count-type="static">
                     <div class="stat-number">$0/mo</div>
                     <div class="stat-label">After purchase. No subscriptions, no per-seat fees, no API charges — ever.</div>
                 </div>
-                <div class="stat-item reveal">
-                    <div class="stat-number">100%</div>
+                <div class="stat-item reveal" data-count-target="100" data-count-suffix="%" data-count-type="number">
+                    <div class="stat-number">0%</div>
                     <div class="stat-label">Of your data stays on-premises. Zero bytes transmitted to external servers.</div>
                 </div>
-                <div class="stat-item reveal">
+                <div class="stat-item reveal" data-count-target="0" data-count-type="static">
                     <div class="stat-number">0</div>
                     <div class="stat-label">Third-party API calls required. All AI inference runs locally on your hardware.</div>
                 </div>
-                <div class="stat-item reveal">
+                <div class="stat-item reveal" data-count-target="1" data-count-type="pulse">
                     <div class="stat-number">1</div>
                     <div class="stat-label">Device replaces your NAS, cloud storage, AI subscriptions, and photo service.</div>
                 </div>
@@ -223,11 +229,33 @@
         </div>
     </section>
 
-    <footer class="footer"><div class="container"><div class="footer-inner">
-        <div class="footer-brand"><img src="images/DS.svg" alt="DS" style="height:22px;width:auto"><span>DysoSphere</span></div>
-        <div class="footer-links"><a href="/">Home</a><a href="/product">Product</a><a href="/solutions">Solutions</a><a href="/about">About</a><a href="/contact">Contact</a></div>
-        <p class="footer-copy">&copy; 2026 DysoSphere &bull; SphereX — Your AI, Your Data, Your Hardware</p>
-    </div></div></footer>
+    <footer class="footer"><div class="container">
+        <div class="footer-inner">
+            <div class="footer-brand-col">
+                <div class="footer-brand"><img src="images/DS.svg" alt="DS" style="height:22px;width:auto"><span>DysoSphere</span></div>
+                <p class="footer-tagline">Your AI, Your Data, Your Hardware. Enterprise AI and sovereign storage — owned by you, forever.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Product</h4>
+                <div class="footer-col-links">
+                    <a href="/">Home</a>
+                    <a href="/product">SphereX</a>
+                    <a href="/solutions">Solutions</a>
+                    <a href="/about">About</a>
+                </div>
+            </div>
+            <div class="footer-col">
+                <h4>Company</h4>
+                <div class="footer-col-links">
+                    <a href="/about">About Us</a>
+                    <a href="/contact">Contact</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p class="footer-copy">&copy; 2026 DysoSphere &bull; SphereX — Your AI, Your Data, Your Hardware</p>
+        </div>
+    </div></footer>
     <script src="script.js"></script>
     <script src="gateway.js"></script>
 </body>
