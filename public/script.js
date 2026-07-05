@@ -33,29 +33,46 @@ document.querySelectorAll('.nav-links a').forEach(a => {
 });
 
 // ── Chat typing animation (Home page) ───────────────────
-const typing1 = document.getElementById('typing1');
-const reply1 = document.getElementById('reply1');
-if (typing1 && reply1) {
-  setTimeout(() => {
+function triggerTypingReply(typingId, replyId, delay) {
+  const typing = document.getElementById(typingId);
+  const reply = document.getElementById(replyId);
+  if (typing && reply) {
+    typing.style.display = 'flex';
+    reply.style.display = 'none';
     setTimeout(() => {
-      typing1.style.display = 'none';
-      reply1.style.display = 'block';
-      reply1.style.animation = 'fadeInUp 0.4s ease';
-    }, 2200);
-  }, 1200);
+      typing.style.display = 'none';
+      reply.style.display = 'block';
+      reply.style.animation = 'fadeInUp 0.4s ease';
+    }, delay);
+  }
 }
 
-const typing2 = document.getElementById('typing2');
-const reply2 = document.getElementById('reply2');
-if (typing2 && reply2) {
-  setTimeout(() => {
-    setTimeout(() => {
-      typing2.style.display = 'none';
-      reply2.style.display = 'block';
-      reply2.style.animation = 'fadeInUp 0.4s ease';
-    }, 2800);
-  }, 1200);
-}
+// Trigger AI demos on load
+setTimeout(() => triggerTypingReply('typing1', 'reply1', 2200), 1200);
+setTimeout(() => triggerTypingReply('typing2', 'reply2', 2800), 1200);
+
+// ── Demo tab switching ──────────────────────────────────
+let nasTriggered = false;
+document.querySelectorAll('.demo-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    // Update active tab
+    document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    
+    // Show correct panel
+    const target = tab.dataset.tab;
+    document.querySelectorAll('.demo-tab-panel').forEach(p => p.classList.remove('active'));
+    const panel = document.getElementById('panel-' + target);
+    if (panel) panel.classList.add('active');
+    
+    // Trigger NAS typing animations on first visit
+    if (target === 'nas' && !nasTriggered) {
+      nasTriggered = true;
+      triggerTypingReply('typing3', 'reply3', 2000);
+      triggerTypingReply('typing4', 'reply4', 2600);
+    }
+  });
+});
 
 // ── Scroll reveal (IntersectionObserver) ─────────────────
 const revealObserver = new IntersectionObserver(entries => {
@@ -85,38 +102,53 @@ document.querySelectorAll('.nav-links a:not(.nav-cta)').forEach(link => {
   }
 });
 
-// ── Hero rotating word animation ─────────────────────────
+// ── Hero typewriter animation ────────────────────────────
 const heroRotate = document.getElementById('heroRotate');
 if (heroRotate) {
-  const words = heroRotate.querySelectorAll('.rotate-text');
-  let currentWord = 0;
+  const words = JSON.parse(heroRotate.dataset.words);
+  const textEl = heroRotate.querySelector('.typewriter-text');
+  let wordIndex = 0;
+  let charIndex = 0;
+  let isDeleting = false;
   
-  // Measure the widest word and set container width
-  let maxWidth = 0;
-  words.forEach(w => {
-    w.style.position = 'relative';
-    w.style.opacity = '1';
-    const rect = w.getBoundingClientRect();
-    if (rect.width > maxWidth) maxWidth = rect.width;
-    w.style.position = '';
-    w.style.opacity = '';
-  });
-  heroRotate.style.width = maxWidth + 'px';
-  heroRotate.style.display = 'inline-block';
+  const typeSpeed = 80;    // ms per character when typing
+  const deleteSpeed = 40;  // ms per character when deleting
+  const pauseAfterType = 1800; // pause after full word typed
+  const pauseAfterDelete = 300; // pause before typing next word
   
-  setInterval(() => {
-    const prev = currentWord;
-    currentWord = (currentWord + 1) % words.length;
+  function tick() {
+    const currentWordStr = words[wordIndex];
     
-    words[prev].classList.remove('active');
-    words[prev].classList.add('exit');
-    
-    setTimeout(() => {
-      words[prev].classList.remove('exit');
-    }, 450);
-    
-    words[currentWord].classList.add('active');
-  }, 2500);
+    if (!isDeleting) {
+      // Typing
+      charIndex++;
+      textEl.textContent = currentWordStr.substring(0, charIndex);
+      
+      if (charIndex === currentWordStr.length) {
+        // Full word typed — pause, then start deleting
+        isDeleting = true;
+        setTimeout(tick, pauseAfterType);
+        return;
+      }
+      setTimeout(tick, typeSpeed);
+    } else {
+      // Deleting
+      charIndex--;
+      textEl.textContent = currentWordStr.substring(0, charIndex);
+      
+      if (charIndex === 0) {
+        // Fully deleted — move to next word
+        isDeleting = false;
+        wordIndex = (wordIndex + 1) % words.length;
+        setTimeout(tick, pauseAfterDelete);
+        return;
+      }
+      setTimeout(tick, deleteSpeed);
+    }
+  }
+  
+  // Start typing the first word after a short delay
+  setTimeout(tick, 500);
 }
 
 // ── Animated stats counter ───────────────────────────────

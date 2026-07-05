@@ -181,12 +181,10 @@ ul{list-style:none}
 .badge-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .hero-title{font-size:clamp(2.6rem,6vw,4.5rem);font-weight:900;line-height:1.06;margin-bottom:28px;letter-spacing:-.035em}
-/* Hero typing animation */
-.hero-rotate-word{display:inline-block;position:relative;color:transparent}
-.hero-rotate-word .rotate-text{position:absolute;left:0;top:0;width:max-content;opacity:0;transform:translateY(12px);transition:opacity .45s ease,transform .45s ease;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero-rotate-word .rotate-text.active{opacity:1;transform:translateY(0)}
-.hero-rotate-word .rotate-text.exit{opacity:0;transform:translateY(-12px)}
-.hero-rotate-cursor{display:inline-block;width:3px;height:.85em;background:var(--brand);margin-left:4px;vertical-align:middle;animation:cursorBlink 1s step-end infinite;border-radius:2px}
+/* Hero typewriter animation */
+.hero-rotate-word{display:inline;vertical-align:baseline}
+.typewriter-text{background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-rotate-cursor{background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:cursorBlink .7s step-end infinite;font-weight:400}
 @keyframes cursorBlink{0%,100%{opacity:1}50%{opacity:0}}
 .hero-subtitle{font-size:1.2rem;color:var(--text-2);max-width:640px;margin:0 auto 44px;line-height:1.8;font-family:var(--font-body)}
 .hero-actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
@@ -390,7 +388,7 @@ ul{list-style:none}
 .why-card::before{content:'';position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:linear-gradient(135deg,rgba(52,118,252,0.4),rgba(37,99,235,0.1),transparent 60%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .35s ease;pointer-events:none}
 .why-card:hover{transform:translateY(-4px);border-color:transparent;box-shadow:0 8px 40px rgba(52,118,252,0.08)}
 .why-card:hover::before{opacity:1}
-.why-card.highlight-card{background:var(--gradient-subtle);border-color:rgba(52,118,252,0.2)}
+.why-card.highlight-card{background:var(--bg-card);border-color:var(--border)}
 .why-icon{font-size:2rem;margin-bottom:16px}
 .why-card h3{font-size:1.12rem;font-weight:700;margin-bottom:8px}
 .why-card p{color:var(--text-2);font-size:.88rem;font-family:var(--font-body);line-height:1.7}
@@ -401,10 +399,23 @@ ul{list-style:none}
 
 .page-hero-content{position:relative;z-index:2;max-width:760px;margin:0 auto}
 
+/* ═══════ DEMO TABS ═══════ */
+.demo-tabs{display:flex;justify-content:center;gap:8px;margin-bottom:24px}
+.demo-tab{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:999px;padding:10px 24px;font-size:.82rem;font-weight:600;letter-spacing:.5px;color:var(--text-3);cursor:pointer;transition:all .25s ease;font-family:var(--font-body)}
+.demo-tab:hover{color:var(--text-1);border-color:var(--border-hover);background:rgba(255,255,255,0.06)}
+.demo-tab.active{background:var(--accent-dim);border-color:var(--brand);color:var(--brand)}
+.demo-tab-panel{display:none;animation:fadeInUp .4s ease}
+.demo-tab-panel.active{display:block}
+
 /* ═══════ DUAL CHAT DEMOS (HOME) ═══════ */
 .dual-chat-demos{display:grid;grid-template-columns:1fr 1fr;gap:28px;max-width:960px;margin:0 auto}
 .dual-chat-demos .chat-window{flex:1}
 .chat-label{font-size:.72rem;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--brand);margin-bottom:10px;display:block;text-align:center}
+
+/* NAS Photo Grid */
+.nas-photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0 12px;border-radius:8px;overflow:hidden}
+.nas-photo-grid img{width:100%;height:80px;object-fit:cover;border-radius:4px;transition:transform .2s ease}
+.nas-photo-grid img:hover{transform:scale(1.05)}
 
 /* ═══════ STATS / ROI SECTION ═══════ */
 .stats-section{padding:100px 0;background:var(--bg-2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);position:relative;overflow:hidden}

@@ -45,7 +45,7 @@
         <div class="hero-scan"></div>
         <div class="hero-content">
             <div class="hero-badge animate-in"><span class="badge-dot"></span>Zero Cloud &bull; Zero Recurring Cost &bull; Total Data Sovereignty</div>
-            <h1 class="hero-title animate-in d1">Your Data. Your AI.<br>Your <span class="hero-rotate-word" id="heroRotate"><span class="rotate-text active">Infrastructure.</span><span class="rotate-text">Privacy.</span><span class="rotate-text">Intelligence.</span><span class="rotate-text">Sovereignty.</span></span><span class="hero-rotate-cursor"></span></h1>
+            <h1 class="hero-title animate-in d1">Your Data. Your AI.<br>Your <span class="hero-rotate-word" id="heroRotate" data-words='["Infrastructure.","Privacy.","Intelligence.","Sovereignty."]'><span class="typewriter-text"></span><span class="hero-rotate-cursor">|</span></span></h1>
             <p class="hero-subtitle animate-in d2">SphereX is the world's first neural-accelerated NAS — a single appliance that delivers enterprise-grade AI inference and petabyte-scale storage, entirely on your premises. No cloud dependency. No recurring fees. No compromises.</p>
             <div class="hero-actions animate-in d3">
                 <a href="contact.html" class="btn btn-primary btn-lg">Deploy SphereX</a>
@@ -57,31 +57,76 @@
                 <div class="trust-badge-item"><span class="trust-badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5"/></svg></span>On-Premises Only</div>
                 <div class="trust-badge-item"><span class="trust-badge-check"><svg viewBox="0 0 12 12"><polyline points="2.5 6 5 8.5 9.5 3.5"/></svg></span>No API Fees</div>
             </div>
-            <div class="animate-in d4 dual-chat-demos">
-                <!-- Enterprise Demo -->
-                <div>
-                    <span class="chat-label">Enterprise</span>
-                    <div class="chat-window">
-                        <div class="chat-header"><div class="chat-avatar">⬡</div><div><strong>SphereX</strong><span class="chat-status">● Local</span></div></div>
-                        <div class="chat-messages">
-                            <div class="msg msg-user">Find the Q3 compliance report that references our updated data retention policy</div>
-                            <div class="msg msg-ai">
-                                <div class="msg-typing" id="typing1"><span></span><span></span><span></span></div>
-                                <div class="msg-content" id="reply1" style="display:none">Found 3 relevant documents in your internal archive 📋<br><br>📄 <strong>Q3-Compliance-Review-2026.pdf</strong><br>📂 /Corporate/Legal/Compliance/<br>🔍 Section 4.2 references the updated 7-year data retention policy<br><br>📄 2 related board memos also reference this policy.<br><br>All processed locally — no data left your network.</div>
+            <div class="animate-in d4">
+                <!-- Demo Tabs -->
+                <div class="demo-tabs">
+                    <button class="demo-tab active" data-tab="ai">🤖 AI Assistant</button>
+                    <button class="demo-tab" data-tab="nas">💾 NAS Storage</button>
+                </div>
+
+                <!-- AI Assistant Panel -->
+                <div class="demo-tab-panel active" id="panel-ai">
+                    <div class="dual-chat-demos">
+                        <!-- Enterprise AI Demo -->
+                        <div>
+                            <span class="chat-label">Enterprise</span>
+                            <div class="chat-window">
+                                <div class="chat-header"><div class="chat-avatar">⬡</div><div><strong>SphereX</strong><span class="chat-status">● Local</span></div></div>
+                                <div class="chat-messages">
+                                    <div class="msg msg-user">Draft a non-disclosure agreement based on our standard template and these custom terms</div>
+                                    <div class="msg msg-ai">
+                                        <div class="msg-typing" id="typing1"><span></span><span></span><span></span></div>
+                                        <div class="msg-content" id="reply1" style="display:none">NDA generated from your template 📄<br><br>📋 <strong>NDA-Draft-2026-07-05.pdf</strong><br>📂 /Legal/Agreements/Drafts/<br><br>✅ Mutual confidentiality clause applied<br>✅ 3-year non-compete term (from your custom terms)<br>✅ Governing law: State of Delaware<br>🔒 IP ownership clause auto-added from template<br><br>Ready for review — all processing done locally on your SphereX.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Personal AI Demo -->
+                        <div>
+                            <span class="chat-label">Personal</span>
+                            <div class="chat-window">
+                                <div class="chat-header"><div class="chat-avatar">⬡</div><div><strong>SphereX</strong><span class="chat-status">● Local</span></div></div>
+                                <div class="chat-messages">
+                                    <div class="msg msg-user">Give me my morning briefing — meetings, deadlines, and summarize any files updated overnight</div>
+                                    <div class="msg msg-ai">
+                                        <div class="msg-typing" id="typing2"><span></span><span></span><span></span></div>
+                                        <div class="msg-content" id="reply2" style="display:none">Good morning! Here's your briefing ☀️<br><br>📅 <strong>3 meetings today</strong><br>&nbsp;&nbsp;• 10:00 AM — Product standup (30 min)<br>&nbsp;&nbsp;• 1:30 PM — Client demo with Acme Corp<br>&nbsp;&nbsp;• 4:00 PM — Sprint review<br><br>⚠️ <strong>2 deadlines approaching</strong><br>&nbsp;&nbsp;• Q3 budget proposal — due tomorrow<br>&nbsp;&nbsp;• Vendor contract renewal — due Friday<br><br>📂 <strong>4 files updated overnight</strong><br>&nbsp;&nbsp;• Marketing deck v3.2 (by Priya)<br>&nbsp;&nbsp;• API docs updated (by Rahul)<br><br>All synced locally. No cloud access needed.</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <!-- Personal Demo -->
-                <div>
-                    <span class="chat-label">Personal</span>
-                    <div class="chat-window">
-                        <div class="chat-header"><div class="chat-avatar">⬡</div><div><strong>SphereX</strong><span class="chat-status">● Local</span></div></div>
-                        <div class="chat-messages">
-                            <div class="msg msg-user">Find the vacation photos from Goa where everyone is on the beach</div>
-                            <div class="msg msg-ai">
-                                <div class="msg-typing" id="typing2"><span></span><span></span><span></span></div>
-                                <div class="msg-content" id="reply2" style="display:none">Found 47 photos matching "beach in Goa" across your library! 📸<br><br>📂 <strong>/Photos/2025/Goa Trip/</strong><br>👥 People detected: You, Priya, Rahul, Mom<br>🏖️ 23 beach photos, 12 sunset shots, 12 group photos<br><br>Want me to create a shared album with just the group photos?</div>
+
+                <!-- NAS Storage Panel -->
+                <div class="demo-tab-panel" id="panel-nas">
+                    <div class="dual-chat-demos">
+                        <!-- NAS File Search Demo -->
+                        <div>
+                            <span class="chat-label">File Search</span>
+                            <div class="chat-window">
+                                <div class="chat-header"><div class="chat-avatar">⬡</div><div><strong>SphereX</strong><span class="chat-status">● Local</span></div></div>
+                                <div class="chat-messages">
+                                    <div class="msg msg-user">Show me all project files modified this week larger than 50MB</div>
+                                    <div class="msg msg-ai">
+                                        <div class="msg-typing" id="typing3"><span></span><span></span><span></span></div>
+                                        <div class="msg-content" id="reply3" style="display:none">Found 5 files matching your criteria 📁<br><br>📄 <strong>ProductDemo-Final.mp4</strong> — 248 MB<br>&nbsp;&nbsp;📂 /Projects/SphereX/Marketing/<br>&nbsp;&nbsp;🕐 Modified: Jul 3, 2026<br><br>📄 <strong>Q3-Dataset-Export.csv</strong> — 127 MB<br>&nbsp;&nbsp;📂 /Analytics/Exports/<br>&nbsp;&nbsp;🕐 Modified: Jul 2, 2026<br><br>📄 <strong>DesignAssets-v4.psd</strong> — 89 MB<br>&nbsp;&nbsp;📂 /Design/Brand/<br>&nbsp;&nbsp;🕐 Modified: Jul 4, 2026<br><br>+ 2 more files. Total: 612 MB across 3 volumes.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- NAS AI Photo Search Demo -->
+                        <div>
+                            <span class="chat-label">AI Photo Search</span>
+                            <div class="chat-window">
+                                <div class="chat-header"><div class="chat-avatar">⬡</div><div><strong>SphereX</strong><span class="chat-status">● Local</span></div></div>
+                                <div class="chat-messages">
+                                    <div class="msg msg-user">Find the vacation photos from Goa where everyone is on the beach</div>
+                                    <div class="msg msg-ai">
+                                        <div class="msg-typing" id="typing4"><span></span><span></span><span></span></div>
+                                        <div class="msg-content" id="reply4" style="display:none">Found 47 photos matching "beach in Goa" 📸<br><br><div class="nas-photo-grid"><img src="images/nas-photo-1.png" alt="Beach group photo"><img src="images/nas-photo-2.png" alt="Sunset beach"><img src="images/nas-photo-3.png" alt="Friends on sand"><img src="images/nas-photo-4.png" alt="Beach scenic"></div>📂 <strong>/Photos/2025/Goa Trip/</strong><br>👥 People detected: You, Priya, Rahul, Mom<br>🏖️ 23 beach photos, 12 sunset shots, 12 group photos<br><br>Want me to create a shared album with just the group photos?</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
