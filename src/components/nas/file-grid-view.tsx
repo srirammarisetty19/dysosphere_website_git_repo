@@ -58,13 +58,13 @@ export function FileGridView({
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-text-tertiary">
-        <div className="h-20 w-20 rounded-2xl border-2 border-dashed border-border-default flex items-center justify-center mb-5">
+        <div className="h-20 w-20 rounded-2xl border-2 border-dashed border-[var(--color-border-default)] flex items-center justify-center mb-5">
           <svg className="h-9 w-9 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
         </div>
-        <p className="text-sm font-medium text-text-secondary">No files here yet</p>
-        <p className="text-xs mt-1.5 text-text-tertiary">Drop files or click &ldquo;New&rdquo; to get started</p>
+        <p className="text-sm font-medium text-[var(--color-text-secondary)]">No files here yet</p>
+        <p className="text-xs mt-1.5 text-[var(--color-text-tertiary)]">Drop files or click &ldquo;New&rdquo; to get started</p>
       </div>
     );
   }
@@ -92,8 +92,8 @@ export function FileGridView({
               animate-grid-item
               ${
                 isSelected
-                  ? "border-accent-blue bg-accent-blue/8 ring-1 ring-accent-blue/30"
-                  : "border-border-subtle bg-bg-tertiary hover:border-border-default hover:bg-bg-elevated hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5"
+                  ? "border-[var(--color-accent-blue)] bg-[var(--color-accent-blue-subtle)] ring-1 ring-[var(--color-accent-blue)]/30"
+                  : "border-[var(--color-border-subtle)] bg-[var(--color-bg-tertiary)] hover:border-[var(--color-border-default)] hover:bg-[var(--color-bg-elevated)] hover:shadow-lg hover:shadow-black/20 hover:-translate-y-0.5"
               }
             `}
             style={{ animationDelay: `${Math.min(index, 15) * 30}ms` }}
@@ -201,11 +201,11 @@ export function FileGridView({
 
             {/* File name */}
             <div className="px-3 py-2.5">
-              <p className="text-sm text-text-primary truncate font-medium">
+              <p className="text-sm text-[var(--color-text-primary)] truncate font-medium">
                 {name}
               </p>
               {item.kind === "file" && (
-                <p className="text-[11px] text-text-tertiary mt-0.5 truncate">
+                <p className="text-[11px] text-[var(--color-text-tertiary)] mt-0.5 truncate">
                   {new Date(item.item.updated_at).toLocaleDateString()}
                 </p>
               )}

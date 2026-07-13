@@ -355,8 +355,8 @@ export default function NasHomePage() {
               relative flex items-center rounded-2xl transition-all duration-200
               ${
                 isSearchFocused
-                  ? "bg-bg-elevated border border-accent-blue/30 shadow-lg shadow-accent-blue/5"
-                  : "bg-white/[0.06] border border-border-subtle hover:bg-white/[0.08] hover:shadow-md"
+                  ? "bg-[var(--color-bg-elevated)] border border-[var(--color-accent-blue)]/30 shadow-lg shadow-[var(--color-accent-blue)]/5"
+                  : "bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] hover:bg-[var(--color-bg-elevated)] hover:shadow-md"
               }
             `}
           >

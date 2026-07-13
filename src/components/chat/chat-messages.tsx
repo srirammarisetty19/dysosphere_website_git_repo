@@ -106,14 +106,6 @@ export function ChatMessages({
 
         return null;
       })}
-
-      {/* Typing indicator when waiting for first token */}
-      {isLoading &&
-        messages.length > 0 &&
-        messages[messages.length - 1].role === "assistant" &&
-        !messages[messages.length - 1].content && (
-          <TypingIndicator />
-        )}
     </div>
   );
 }
@@ -191,7 +183,7 @@ function CopyButton({ text }: { text: string }) {
       className={`p-1.5 rounded-lg transition-all duration-200 ${
         copied
           ? "text-green-400 bg-green-400/10"
-          : "text-white/30 hover:text-white/60 hover:bg-white/5"
+          : "text-white/40 hover:text-white/70 hover:bg-white/[0.06]"
       }`}
       title={copied ? "Copied!" : "Copy message"}
     >
@@ -209,7 +201,7 @@ function RetryButton({ messageIndex }: { messageIndex: number }) {
     <button
       onClick={() => retryMessage(messageIndex)}
       disabled={isLoading}
-      className="p-1.5 rounded-lg transition-all duration-200 text-white/30 hover:text-white/60 hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
+      className="p-1.5 rounded-lg transition-all duration-200 text-white/40 hover:text-white/70 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed"
       title="Retry"
     >
       <RefreshCw size={14} />
@@ -260,8 +252,8 @@ function ReadAloudButton({ text }: { text: string }) {
       onClick={handleToggle}
       className={`p-1.5 rounded-lg transition-all duration-200 ${
         isSpeaking
-          ? "text-[var(--color-accent-cyan)] bg-[var(--color-accent-cyan)]/10"
-          : "text-white/30 hover:text-white/60 hover:bg-white/5"
+          ? "text-[var(--color-accent-blue)] bg-[var(--color-accent-blue)]/10"
+          : "text-white/40 hover:text-white/70 hover:bg-white/[0.06]"
       }`}
       title={isSpeaking ? "Stop reading" : "Read aloud"}
     >
@@ -298,7 +290,7 @@ function ShareButton({ text }: { text: string }) {
       className={`p-1.5 rounded-lg transition-all duration-200 ${
         shared
           ? "text-green-400 bg-green-400/10"
-          : "text-white/30 hover:text-white/60 hover:bg-white/5"
+          : "text-white/40 hover:text-white/70 hover:bg-white/[0.06]"
       }`}
       title="Share"
     >
@@ -333,8 +325,8 @@ function ThumbsButton({
       onClick={handleClick}
       className={`p-1.5 rounded-lg transition-all duration-200 ${
         isActive
-          ? "text-[var(--color-accent-cyan)] bg-[var(--color-accent-cyan)]/10"
-          : "text-white/30 hover:text-white/60 hover:bg-white/5"
+          ? "text-[var(--color-accent-blue)] bg-[var(--color-accent-blue)]/10"
+          : "text-white/40 hover:text-white/70 hover:bg-white/[0.06]"
       }`}
       title={direction === "up" ? "Good response" : "Bad response"}
     >
@@ -429,12 +421,10 @@ function UserBubble({
   }
 
   return (
-    <div className="group flex gap-3 py-5 justify-end">
+    <div className="group flex gap-3 py-6 justify-end">
       {/* Bubble */}
-      <div className="max-w-[80%] lg:max-w-[70%]">
+      <div className="max-w-[75%] lg:max-w-[65%]">
         {/* ── NAS InPlace AI File Reference Chip (first user message only) ── */}
-        {/* Industry pattern: Google Photos Ask / Samsung Galaxy AI surface   */}
-        {/* the file context on the question side for grounding clarity.      */}
         {nasFilename && (
           <div className="flex justify-end mb-2">
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--color-accent-blue)]/10 border border-[var(--color-accent-blue)]/20">
@@ -482,7 +472,6 @@ function UserBubble({
           </div>
         )}
         {/* Non-image file parts (documents, code, audio, etc.) */}
-        {/* Industry pattern (ChatGPT/Gemini): icon chip with filename */}
         {hasParts && (() => {
           const fileParts = parts!.filter((p) => p.type !== 'text' && p.type !== 'image');
           if (fileParts.length === 0) return null;
@@ -495,19 +484,19 @@ function UserBubble({
           );
         })()}
         {displayContent && (
-          <div className="px-4 py-3 rounded-2xl rounded-br-md bg-gradient-to-br from-white/[0.08] to-white/[0.04] border border-white/[0.08]">
-            <p className="text-white text-[15px] leading-relaxed whitespace-pre-wrap">
+          <div className="px-4 py-3 rounded-2xl bg-[var(--color-accent-blue)]/10 border border-[var(--color-accent-blue)]/15">
+            <p className="text-[var(--color-text-primary)] text-[15px] leading-relaxed whitespace-pre-wrap">
               {displayContent}
             </p>
           </div>
         )}
         {/* ── User Actions: Copy + Retry (below message, right-aligned) ── */}
-        <div className="flex items-center gap-0.5 mt-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-0.5 mt-1.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-150">
           <CopyButton text={displayContent || content} />
           <RetryButton messageIndex={messageIndex} />
           {/* Timestamp */}
           {timestamp && (
-            <span className="text-white/20 text-[10px] ml-2">
+            <span className="text-white/30 text-[10px] ml-2">
               {formatTimestamp(timestamp)}
             </span>
           )}
@@ -515,8 +504,8 @@ function UserBubble({
       </div>
 
       {/* Avatar */}
-      <div className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0 mt-1">
-        <User size={14} className="text-white/40" />
+      <div className="w-8 h-8 rounded-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)] flex items-center justify-center shrink-0 mt-0.5">
+        <User size={15} className="text-white/50" />
       </div>
     </div>
   );
@@ -563,16 +552,22 @@ function AssistantBubble({
     (thinkContent && thinkContent.length > 0) || steps.length > 0;
 
   return (
-    <div className="group flex gap-3 py-5">
+    <div className="group flex gap-3 py-6">
       {/* Avatar */}
-      <div className="w-7 h-7 rounded-full gradient-bg p-[1px] shrink-0 mt-1">
-        <div className="w-full h-full rounded-full bg-[var(--color-bg-primary)] flex items-center justify-center">
-          <Sparkles size={13} className="text-[var(--color-accent-cyan)]" />
-        </div>
+      <div className="w-8 h-8 rounded-full bg-[var(--color-accent-blue)] shrink-0 mt-0.5 flex items-center justify-center">
+          <Sparkles size={14} className="text-white" />
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0 space-y-2">
+        {/* Sender label */}
+        <span className="text-[13px] font-semibold text-white/70">Sphere AI</span>
+
+        {/* Inline typing indicator — shows when streaming with no content yet */}
+        {isStreaming && !finalResponse && !hasThinkingOrSteps && (
+          <TypingIndicator />
+        )}
+
         {/* Thinking Block */}
         {hasThinkingOrSteps && (
           <ThinkingBlock
@@ -624,36 +619,39 @@ function AssistantBubble({
             {nas_files.map((file, i) => (
               <div
                 key={i}
-                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.05] hover:border-white/[0.1] transition-all cursor-default"
+                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.06] hover:border-white/[0.12] transition-all cursor-default"
               >
                 <div className="w-8 h-8 rounded-lg bg-sky-400/10 flex items-center justify-center shrink-0">
                   <Download size={14} className="text-sky-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-white/70 text-[13px] font-medium truncate max-w-[200px]">
+                  <p className="text-white/75 text-[13px] font-medium truncate max-w-[200px]">
                     {file.name}
                   </p>
-                  <p className="text-white/20 text-[10px]">{file.type || "File"}</p>
+                  <p className="text-white/30 text-[10px]">{file.type || "File"}</p>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* ── Action Row: Copy | Retry | Read Aloud | Share | Feedback ───── */}
-        {/* Industry standard (ChatGPT/Gemini): retry on assistant bubble   */}
+        {/* ── Action Row: Copy | Retry | Read Aloud  ·  Share  ·  Feedback ── */}
         {finalResponse && !isStreaming && (
-          <div className="flex items-center gap-0.5 mt-1">
+          <div className="flex items-center gap-0.5 mt-2">
             <CopyButton text={finalResponse} />
             <RetryButton messageIndex={messageIndex} />
             <ReadAloudButton text={finalResponse} />
+            {/* Separator */}
+            <div className="w-px h-4 bg-white/10 mx-1" />
             <ShareButton text={finalResponse} />
+            {/* Separator */}
+            <div className="w-px h-4 bg-white/10 mx-1" />
             <ThumbsButton messageIndex={messageIndex} direction="up" />
             <ThumbsButton messageIndex={messageIndex} direction="down" />
 
             {/* Timestamp */}
             {message.created_at && (
-              <span className="text-white/20 text-[10px] ml-2">
+              <span className="text-white/30 text-[10px] ml-3">
                 {formatTimestamp(message.created_at)}
               </span>
             )}

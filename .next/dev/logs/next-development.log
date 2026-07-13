@@ -1,1 +1,12 @@
 {"timestamp":"00:00:00.973","source":"Server","level":"LOG","message":""}
+{"timestamp":"00:40:29.501","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}
+{"timestamp":"00:40:35.570","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}
+{"timestamp":"00:43:15.873","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}
+{"timestamp":"00:43:33.105","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}
+{"timestamp":"00:43:44.424","source":"Server","level":"ERROR","message":"[BFF Proxy] Error forwarding to http://127.0.0.1:8001/ai/users/login: TypeError: fetch failed"}
+{"timestamp":"00:43:50.259","source":"Server","level":"ERROR","message":"[BFF Proxy] Error forwarding to http://127.0.0.1:8001/ai/users/login: TypeError: fetch failed"}
+{"timestamp":"00:43:51.141","source":"Server","level":"ERROR","message":"[BFF Proxy] Error forwarding to http://127.0.0.1:8001/ai/users/login: TypeError: fetch failed"}
+{"timestamp":"00:43:59.708","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}
+{"timestamp":"00:44:06.067","source":"Server","level":"ERROR","message":"[BFF Proxy] Error forwarding to http://127.0.0.1:8001/ai/users/login: TypeError: fetch failed"}
+{"timestamp":"00:44:09.686","source":"Browser","level":"INFO","message":"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"}
+{"timestamp":"00:44:16.867","source":"Server","level":"ERROR","message":"[BFF Proxy] Error forwarding to http://127.0.0.1:8001/ai/users/login: TypeError: fetch failed"}

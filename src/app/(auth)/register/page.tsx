@@ -45,11 +45,11 @@ function PasswordRequirement({ label, met }: { label: string; met: boolean }) {
   return (
     <div className="flex items-center gap-2">
       {met ? (
-        <CheckCircle2 className="h-3.5 w-3.5 text-[var(--color-accent-cyan)] shrink-0" />
+        <CheckCircle2 className="h-3.5 w-3.5 text-[var(--color-accent-blue)] shrink-0" />
       ) : (
         <Circle className="h-3.5 w-3.5 text-white/25 shrink-0" />
       )}
-      <span className={`text-[12px] transition-colors ${met ? "text-white/70" : "text-white/30"}`}>
+      <span className={`text-[12px] transition-colors ${met ? "text-[var(--color-text-secondary)]" : "text-[var(--color-text-muted)]"}`}>
         {label}
       </span>
     </div>
@@ -136,10 +136,10 @@ function RegisterPageInner() {
   };
 
   const inputClass = (hasError: boolean) =>
-    `w-full pl-12 pr-4 py-4 bg-white/5 border rounded-[14px] text-white text-[15px] placeholder:text-white/15 focus:outline-none transition-colors disabled:opacity-50 ${
+    `w-full pl-12 pr-4 py-4 bg-white/[0.06] border rounded-[14px] text-[var(--color-text-primary)] text-[15px] placeholder:text-[var(--color-text-muted)] focus:outline-none transition-colors disabled:opacity-50 ${
       hasError
         ? "border-red-500/50 focus:border-red-500"
-        : "border-transparent focus:border-[var(--color-accent-cyan)]"
+        : "border-[var(--color-border-default)] focus:border-[var(--color-accent-blue)]"
     }`;
 
   return (
@@ -151,7 +151,7 @@ function RegisterPageInner() {
           <h1 className="text-white text-xl font-bold tracking-tight leading-tight">
             Sphere AI
           </h1>
-          <p className="text-white/30 text-xs">Create your account</p>
+          <p className="text-[var(--color-text-muted)] text-xs">Create your account</p>
         </div>
       </div>
 
@@ -163,7 +163,7 @@ function RegisterPageInner() {
           <div>
             <div className="relative">
               <User
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
                 size={18}
               />
               <input
@@ -191,7 +191,7 @@ function RegisterPageInner() {
           <div>
             <div className="relative">
               <Mail
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
                 size={18}
               />
               <input
@@ -217,7 +217,7 @@ function RegisterPageInner() {
           <div>
             <div className="relative">
               <Lock
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
                 size={18}
               />
               <input
@@ -262,7 +262,7 @@ function RegisterPageInner() {
           <div>
             <div className="relative">
               <Lock
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
                 size={18}
               />
               <input
@@ -305,7 +305,7 @@ function RegisterPageInner() {
             id="register-submit"
             type="submit"
             disabled={isLoading}
-            className="w-full h-[52px] rounded-[14px] gradient-bg text-white font-semibold text-base tracking-wide hover:brightness-110 active:brightness-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+            className="w-full h-[52px] rounded-[14px] bg-[var(--color-accent-blue)] text-white font-semibold text-base tracking-wide hover:bg-[var(--color-accent-blue-hover)] active:brightness-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {isLoading ? (
               <Loader2 className="animate-spin" size={22} />
@@ -317,11 +317,11 @@ function RegisterPageInner() {
       </div>
 
       {/* Sign In Link */}
-      <p className="mt-7 text-white/30 text-[13px]">
+      <p className="mt-7 text-[var(--color-text-muted)] text-[13px]">
         Already have an account?{" "}
         <Link
           href={service ? `/login?service=${service}` : "/login"}
-          className="text-[var(--color-accent-teal)] font-semibold hover:underline"
+          className="text-[var(--color-accent-blue)] font-semibold hover:underline"
         >
           Sign in
         </Link>

@@ -61,7 +61,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed = false, onToggleColla
       <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50
-          bg-[var(--color-bg-secondary)] border-r border-white/[0.06]
+          bg-[var(--color-bg-secondary)] border-r border-[var(--color-border-subtle)]
           flex flex-col
           transition-all duration-300 ease-out
           ${isOpen ? "translate-x-0 w-72" : "-translate-x-full lg:translate-x-0"}
@@ -70,10 +70,10 @@ export function AppSidebar({ isOpen, onClose, isCollapsed = false, onToggleColla
         `}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 h-14 border-b border-white/[0.04] shrink-0">
+        <div className="flex items-center justify-between px-4 h-14 border-b border-[var(--color-border-subtle)] shrink-0">
           <div className="flex items-center gap-2">
             <DSLogo size={18} className="text-[var(--color-accent-blue)]" />
-            <span className="text-white/70 text-sm font-semibold tracking-tight">
+            <span className="text-[var(--color-text-secondary)] text-sm font-semibold tracking-tight">
               Sphere AI
             </span>
           </div>
@@ -99,7 +99,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed = false, onToggleColla
         </div>
 
         {/* Navigation */}
-        <nav className="px-3 py-3 space-y-1 border-b border-white/[0.04]">
+        <nav className="px-3 py-3 space-y-0.5 border-b border-[var(--color-border-subtle)]">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -110,8 +110,8 @@ export function AppSidebar({ isOpen, onClose, isCollapsed = false, onToggleColla
                 onClick={onClose}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   isActive
-                    ? "bg-white/[0.08] text-white border border-white/[0.1]"
-                    : "text-white/40 hover:text-white/60 hover:bg-white/[0.04] border border-transparent"
+                    ? "bg-[var(--color-accent-blue-subtle)] text-[var(--color-accent-blue)]"
+                    : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] hover:bg-white/[0.04]"
                 }`}
               >
                 <Icon size={16} />
@@ -194,14 +194,14 @@ function ChatSection({ onClose }: { onClose: () => void }) {
       <div className="px-3 py-3 space-y-1.5">
         <button
           onClick={() => handleNewChat(false)}
-          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.12] transition-all text-white/70 text-sm font-medium"
+          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-[var(--color-accent-blue)] text-white text-sm font-medium hover:bg-[var(--color-accent-blue-hover)] transition-all"
         >
           <Plus size={16} />
           New Chat
         </button>
         <button
           onClick={() => handleNewChat(true)}
-          className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl hover:bg-white/[0.04] transition-colors text-white/30 text-xs"
+          className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl hover:bg-white/[0.04] transition-colors text-[var(--color-text-muted)] text-xs"
         >
           <EyeOff size={14} />
           Temporary Chat
@@ -235,8 +235,8 @@ function ChatSection({ onClose }: { onClose: () => void }) {
               key={convo.id || `convo-${index}`}
               className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${
                 isActive
-                  ? "bg-white/[0.08] border border-white/[0.1]"
-                  : "hover:bg-white/[0.04] border border-transparent"
+                  ? "bg-[var(--color-accent-blue-subtle)]"
+                  : "hover:bg-white/[0.04]"
               }`}
               onClick={() => handleSelectConversation(convo.id)}
             >
@@ -244,7 +244,7 @@ function ChatSection({ onClose }: { onClose: () => void }) {
               {convo.is_pinned && (
                 <Pin
                   size={11}
-                  className="text-[var(--color-accent-cyan)]/50 shrink-0 rotate-45"
+                  className="text-[var(--color-accent-blue)]/50 shrink-0 rotate-45"
                 />
               )}
 
@@ -264,11 +264,11 @@ function ChatSection({ onClose }: { onClose: () => void }) {
                     className="w-full bg-white/10 rounded px-2 py-1 text-white text-xs focus:outline-none"
                   />
                 ) : (
-                  <p className="text-white/60 text-[13px] truncate leading-tight">
+                  <p className="text-[var(--color-text-secondary)] text-[13px] truncate leading-tight">
                     {convo.title || "Untitled"}
                   </p>
                 )}
-                <p className="text-white/20 text-[10px] mt-0.5">
+                <p className="text-[var(--color-text-muted)] text-[10px] mt-0.5">
                   {formatDate(convo.created_at)}
                 </p>
               </div>

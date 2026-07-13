@@ -159,8 +159,8 @@ export function NasSidebar({ isOpen, onClose, isCollapsed = false, onToggleColla
                 transition-all duration-150
                 ${
                   isActive(href, exact)
-                    ? "bg-accent-blue/12 text-accent-blue"
-                    : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+                    ? "bg-[var(--color-accent-blue-subtle)] text-[var(--color-accent-blue)]"
+                    : "text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)]"
                 }
               `}
             >
@@ -183,8 +183,8 @@ export function NasSidebar({ isOpen, onClose, isCollapsed = false, onToggleColla
                 transition-all duration-150
                 ${
                   isActive(href)
-                    ? "bg-accent-blue/12 text-accent-blue"
-                    : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+                    ? "bg-[var(--color-accent-blue-subtle)] text-[var(--color-accent-blue)]"
+                    : "text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)]"
                 }
               `}
             >
@@ -210,8 +210,8 @@ export function NasSidebar({ isOpen, onClose, isCollapsed = false, onToggleColla
                 transition-all duration-150
                 ${
                   isActive(href)
-                    ? "bg-accent-blue/12 text-accent-blue"
-                    : "text-text-secondary hover:bg-white/5 hover:text-text-primary"
+                    ? "bg-[var(--color-accent-blue-subtle)] text-[var(--color-accent-blue)]"
+                    : "text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)]"
                 }
               `}
             >

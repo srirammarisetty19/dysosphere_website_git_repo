@@ -39,7 +39,7 @@ export function FileListView({
   return (
     <div className="px-4">
       {/* Header row */}
-      <div className="grid grid-cols-[1fr_120px_100px_40px] gap-4 px-4 py-2 text-xs font-medium text-text-tertiary uppercase tracking-wider border-b border-border-subtle">
+      <div className="grid grid-cols-[1fr_120px_100px_40px] gap-4 px-4 py-2 text-xs font-medium text-[var(--color-text-tertiary)] uppercase tracking-wider border-b border-[var(--color-border-subtle)]">
         <span>Name</span>
         <span className="hidden sm:block">Modified</span>
         <span className="hidden sm:block text-right">Size</span>
@@ -65,10 +65,10 @@ export function FileListView({
               animate-list-row list-row-hover
               ${
                 isSelected
-                  ? "bg-accent-blue/8"
+                  ? "bg-[var(--color-accent-blue-subtle)]"
                   : index % 2 === 1
-                    ? "bg-white/[0.015] hover:bg-white/[0.04]"
-                    : "hover:bg-white/[0.03]"
+                    ? "bg-white/[0.02] hover:bg-white/[0.05]"
+                    : "hover:bg-white/[0.04]"
               }
             `}
             style={{ animationDelay: `${Math.min(index, 20) * 20}ms` }}
@@ -99,7 +99,7 @@ export function FileListView({
                   }
                   ${
                     isSelected
-                      ? "bg-accent-blue border-accent-blue"
+                      ? "bg-[var(--color-accent-blue)] border-[var(--color-accent-blue)]"
                       : "border-white/30"
                   }
                 `}
@@ -128,7 +128,7 @@ export function FileListView({
 
               {/* Name */}
               <div className="min-w-0 flex items-center gap-2">
-                <span className="text-sm text-text-primary truncate">
+                <span className="text-sm text-[var(--color-text-primary)] truncate">
                   {name}
                 </span>
                 {isStarred && (
@@ -138,12 +138,12 @@ export function FileListView({
             </div>
 
             {/* Modified date */}
-            <span className="hidden sm:block text-xs text-text-tertiary">
+            <span className="hidden sm:block text-xs text-[var(--color-text-tertiary)]">
               {new Date(item.item.updated_at).toLocaleDateString()}
             </span>
 
             {/* Size */}
-            <span className="hidden sm:block text-xs text-text-tertiary text-right">
+            <span className="hidden sm:block text-xs text-[var(--color-text-tertiary)] text-right">
               {item.kind === "file"
                 ? formatBytes(item.item.size)
                 : `${item.kind === "directory" ? "—" : ""}`}
@@ -157,7 +157,7 @@ export function FileListView({
                 onContextMenu(item, e);
               }}
             >
-              <MoreVertical className="h-4 w-4 text-text-tertiary" />
+              <MoreVertical className="h-4 w-4 text-[var(--color-text-tertiary)]" />
             </button>
           </div>
         );

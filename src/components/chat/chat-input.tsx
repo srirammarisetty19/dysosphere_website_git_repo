@@ -210,7 +210,7 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
 
   return (
     <div
-      className="border-t border-white/[0.04] bg-[var(--color-bg-primary)] px-4 py-3"
+      className="border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)] px-4 py-3"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -219,8 +219,8 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
       <div className="max-w-3xl mx-auto">
         {/* Drag overlay */}
         {isDragging && (
-          <div className="mb-3 flex items-center justify-center py-6 rounded-2xl border-2 border-dashed border-[var(--color-accent-cyan)]/30 bg-[var(--color-accent-cyan)]/5 transition-all">
-            <div className="flex items-center gap-2 text-[var(--color-accent-cyan)]/60 text-sm">
+          <div className="mb-3 flex items-center justify-center py-6 rounded-2xl border-2 border-dashed border-[var(--color-accent-blue)]/30 bg-[var(--color-accent-blue)]/5 transition-all">
+            <div className="flex items-center gap-2 text-[var(--color-accent-blue)]/60 text-sm">
               <Paperclip size={16} />
               <span>Drop files here to attach</span>
             </div>
@@ -243,7 +243,7 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
             </div>
             <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
               <div
-                className="h-full rounded-full gradient-bg transition-all duration-500 ease-out"
+                className="h-full rounded-full bg-[var(--color-accent-blue)] transition-all duration-500 ease-out"
                 style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
               />
             </div>
@@ -277,8 +277,8 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
         <div
           className={`flex items-end gap-2 p-2 rounded-2xl border transition-all duration-200 ${
             isDragging
-              ? "border-[var(--color-accent-cyan)]/30 bg-[var(--color-accent-cyan)]/5"
-              : "bg-white/[0.04] border-white/[0.08] focus-within:border-white/[0.15] focus-within:bg-white/[0.05]"
+              ? "border-[var(--color-accent-blue)]/30 bg-[var(--color-accent-blue)]/5"
+              : "bg-[var(--color-bg-tertiary)] border-[var(--color-border-default)] focus-within:border-[var(--color-accent-blue)]/40 focus-within:bg-[var(--color-bg-elevated)]"
           }`}
         >
           {/* Hidden file input */}
@@ -294,7 +294,7 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
           {/* Attachment button */}
           <button
             onClick={handleFileSelect}
-            className="p-2 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors shrink-0 mb-0.5"
+            className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-white/5 transition-colors shrink-0 mb-0.5"
             title="Attach file (or drag & drop)"
           >
             <Paperclip size={18} />
@@ -309,7 +309,7 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
             placeholder="Message Sphere AI..."
             disabled={isLoading}
             rows={1}
-            className="flex-1 bg-transparent text-white text-[15px] placeholder:text-white/20 resize-none focus:outline-none py-2 leading-relaxed min-h-[24px] max-h-[200px] disabled:opacity-50"
+            className="flex-1 bg-transparent text-[var(--color-text-primary)] text-[15px] placeholder:text-[var(--color-text-muted)] resize-none focus:outline-none py-2 leading-relaxed min-h-[24px] max-h-[200px] disabled:opacity-50"
           />
 
           {/* Voice button */}
@@ -340,8 +340,8 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
               disabled={!hasContent}
               className={`p-2.5 rounded-xl transition-all shrink-0 mb-0.5 ${
                 hasContent
-                  ? "gradient-bg text-white hover:brightness-110 hover:scale-105 active:scale-95 shadow-lg shadow-[var(--color-accent-cyan)]/10"
-                  : "bg-white/[0.06] text-white/20 cursor-not-allowed"
+                  ? "bg-[var(--color-accent-blue)] text-white hover:bg-[var(--color-accent-blue-hover)] hover:scale-105 active:scale-95"
+                  : "bg-white/[0.06] text-[var(--color-text-muted)] cursor-not-allowed"
               }`}
               title="Send message (Enter)"
             >
@@ -352,10 +352,10 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
 
         {/* Bottom hints */}
         <div className="flex items-center justify-between mt-2 px-1">
-          <p className="text-white/10 text-[11px]">
+          <p className="text-[var(--color-text-muted)] text-[11px]">
             Sphere AI processes everything locally on your SphereX device
           </p>
-          <div className="hidden md:flex items-center gap-3 text-white/10 text-[10px]">
+          <div className="hidden md:flex items-center gap-3 text-[var(--color-text-muted)] text-[10px]">
             <span>
               <kbd className="px-1 py-0.5 rounded bg-white/5 text-white/20 text-[9px] font-mono">Enter</kbd> send
             </span>

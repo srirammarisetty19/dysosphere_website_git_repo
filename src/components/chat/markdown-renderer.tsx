@@ -68,7 +68,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
           // ── Paragraphs ───────────────────────────────────────────
           p: ({ children, ...props }) => (
             <p
-              className="text-[0.9375rem] text-white/70 leading-[1.8] my-3 first:mt-0 last:mb-0"
+              className="text-[0.9375rem] text-white/80 leading-[1.8] my-3 first:mt-0 last:mb-0"
               {...props}
             >
               {children}
@@ -84,7 +84,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
 
           // ── Emphasis ─────────────────────────────────────────────
           em: ({ children, ...props }) => (
-            <em className="italic text-white/60" {...props}>
+            <em className="italic text-white/65" {...props}>
               {children}
             </em>
           ),
@@ -92,7 +92,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
           // ── Lists ────────────────────────────────────────────────
           ul: ({ children, ...props }) => (
             <ul
-              className="my-3 pl-5 space-y-1.5 list-disc marker:text-white/20"
+              className="my-3 pl-5 space-y-1.5 list-disc marker:text-white/30"
               {...props}
             >
               {children}
@@ -100,7 +100,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
           ),
           ol: ({ children, ...props }) => (
             <ol
-              className="my-3 pl-5 space-y-1.5 list-decimal marker:text-white/30"
+              className="my-3 pl-5 space-y-1.5 list-decimal marker:text-white/40"
               {...props}
             >
               {children}
@@ -108,7 +108,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
           ),
           li: ({ children, ...props }) => (
             <li
-              className="text-[0.9375rem] text-white/70 leading-[1.7] pl-1"
+              className="text-[0.9375rem] text-white/80 leading-[1.7] pl-1"
               {...props}
             >
               {children}
@@ -130,7 +130,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
             }
             return (
               <code
-                className="text-[var(--color-accent-teal)] bg-white/[0.06] px-1.5 py-0.5 rounded-md text-[0.8125rem] font-mono border border-white/[0.04]"
+                className="text-[var(--color-accent-blue)] bg-[var(--color-accent-blue)]/8 px-1.5 py-0.5 rounded-md text-[0.8125rem] font-mono border border-[var(--color-accent-blue)]/12"
                 {...props}
               >
                 {children}
@@ -149,7 +149,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
           ),
           th: ({ children, ...props }) => (
             <th
-              className="text-left text-white/50 font-semibold text-[0.75rem] uppercase tracking-wider px-4 py-2.5 border-b border-white/[0.08]"
+              className="text-left text-white/55 font-semibold text-[0.75rem] uppercase tracking-wider px-4 py-2.5 border-b border-white/[0.08]"
               {...props}
             >
               {children}
@@ -157,7 +157,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
           ),
           td: ({ children, ...props }) => (
             <td
-              className="text-white/60 px-4 py-2.5 border-b border-white/[0.03]"
+              className="text-white/70 px-4 py-2.5 border-b border-white/[0.03]"
               {...props}
             >
               {children}
@@ -172,7 +172,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
           // ── Blockquote ───────────────────────────────────────────
           blockquote: ({ children, ...props }) => (
             <blockquote
-              className="my-4 pl-4 border-l-[3px] border-[var(--color-accent-purple)]/40 text-white/50 italic"
+              className="my-4 pl-4 border-l-[3px] border-[var(--color-accent-blue)]/30 text-white/55 italic"
               {...props}
             >
               {children}
@@ -190,7 +190,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[var(--color-accent-teal)] underline decoration-[var(--color-accent-teal)]/30 hover:decoration-[var(--color-accent-teal)] underline-offset-2 transition-all"
+              className="text-[var(--color-accent-blue)] underline decoration-[var(--color-accent-blue)]/30 hover:decoration-[var(--color-accent-blue)] underline-offset-2 transition-all"
               {...props}
             >
               {children}
@@ -277,7 +277,7 @@ function CodeBlock({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
     <div className="relative group rounded-xl overflow-hidden my-4 bg-[#0c1018] border border-white/[0.06]">
       {/* Header bar */}
       <div className="flex items-center justify-between px-4 py-2 bg-white/[0.025] border-b border-white/[0.04]">
-        <span className="text-[10px] text-white/25 font-mono uppercase tracking-widest">
+        <span className="text-[10px] text-white/35 font-mono uppercase tracking-widest">
           {language || "code"}
         </span>
         <button
@@ -285,7 +285,7 @@ function CodeBlock({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] transition-all ${
             copied
               ? "text-green-400 bg-green-400/10"
-              : "text-white/25 hover:text-white/50 hover:bg-white/[0.04]"
+              : "text-white/35 hover:text-white/55 hover:bg-white/[0.04]"
           }`}
           title="Copy code"
         >

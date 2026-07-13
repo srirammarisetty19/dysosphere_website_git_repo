@@ -100,8 +100,8 @@ export function ThinkingBlock({
     <div
       className={`rounded-[14px] border transition-colors duration-300 ${
         isStreaming
-          ? "border-[var(--color-accent-cyan)]/25 thinking-active"
-          : "border-white/[0.07]"
+          ? "border-[var(--color-accent-blue)]/25 thinking-active"
+          : "border-white/[0.1]"
       } bg-white/[0.02] overflow-hidden`}
     >
       {/* Header */}
@@ -115,7 +115,7 @@ export function ThinkingBlock({
             <Brain size={16} className="text-white" />
           </span>
         ) : (
-          <Brain size={16} className="text-white/40" />
+          <Brain size={16} className="text-white/50" />
         )}
 
         {/* Label */}
@@ -123,7 +123,7 @@ export function ThinkingBlock({
           className={`flex-1 text-left text-[13px] ${
             isStreaming
               ? "text-white font-semibold"
-              : "text-white/50 font-medium"
+              : "text-white/55 font-medium"
           } tracking-wide truncate`}
         >
           {headerLabel}
@@ -131,13 +131,13 @@ export function ThinkingBlock({
 
         {/* Elapsed time (streaming only) */}
         {isStreaming && elapsedLabel && (
-          <span className="text-white/25 text-[11px] mr-1">{elapsedLabel}</span>
+          <span className="text-white/35 text-[11px] mr-1">{elapsedLabel}</span>
         )}
 
         {/* Expand chevron */}
         <ChevronDown
           size={16}
-          className={`text-white/30 transition-transform duration-250 ${
+          className={`text-white/40 transition-transform duration-250 ${
             expanded ? "rotate-180" : ""
           }`}
         />
@@ -149,7 +149,7 @@ export function ThinkingBlock({
           {iterationSummaries.map((summary, i) => (
             <div key={i} className="flex items-start gap-1.5">
               <CheckCircle size={12} className="text-green-400/60 mt-0.5 shrink-0" />
-              <span className="text-[11px] text-white/35 italic">{summary}</span>
+              <span className="text-[11px] text-white/45 italic">{summary}</span>
             </div>
           ))}
         </div>
@@ -157,7 +157,7 @@ export function ThinkingBlock({
 
       {/* Expanded Body */}
       {expanded && (
-        <div className="border-t border-white/5">
+        <div className="border-t border-white/[0.08]">
           <div className="px-4 py-3 space-y-2">
             {/* Tool Steps Timeline */}
             {steps.length > 0 && (
@@ -170,7 +170,7 @@ export function ThinkingBlock({
 
             {/* Thinking Content (dimmed, italic markdown) */}
             {thinkContent && (
-              <div className="mt-3 pt-3 border-t border-white/5">
+              <div className="mt-3 pt-3 border-t border-white/[0.08]">
                 <div className="text-white/40 text-[12.5px] italic leading-relaxed">
                   <MarkdownRenderer content={thinkContent} dimmed />
                 </div>
@@ -209,14 +209,14 @@ function getStepIcon(step: string) {
   if (s.includes("search") || s.includes("web"))
     return <Search size={13} className="text-green-400" />;
   if (s.includes("file") || s.includes("read") || s.includes("write"))
-    return <FileText size={13} className="text-white/40" />;
+    return <FileText size={13} className="text-white/50" />;
   if (s.includes("browser") || s.includes("url") || s.includes("fetch"))
     return <Globe size={13} className="text-purple-400" />;
   if (s.includes("code") || s.includes("exec"))
-    return <Code size={13} className="text-white/40" />;
+    return <Code size={13} className="text-white/50" />;
   if (s.includes("✅"))
     return <CheckCircle size={13} className="text-green-400" />;
-  return <ArrowRight size={13} className="text-white/30" />;
+  return <ArrowRight size={13} className="text-white/40" />;
 }
 
 function getStepColor(step: string) {
@@ -231,5 +231,5 @@ function getStepColor(step: string) {
     return "text-purple-400/80";
   if (s.includes("✅"))
     return "text-green-400/70";
-  return "text-white/40";
+  return "text-white/50";
 }

@@ -138,7 +138,7 @@ function ConversationTile({
     >
       {/* Pin indicator */}
       {showPin && convo.is_pinned && (
-        <Pin size={11} className="text-[var(--color-accent-cyan)]/50 shrink-0 rotate-45" />
+        <Pin size={11} className="text-[var(--color-accent-blue)]/50 shrink-0 rotate-45" />
       )}
 
       {/* Title / rename input + metadata */}

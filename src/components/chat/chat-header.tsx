@@ -29,11 +29,11 @@ export function ChatHeader({
   const initial = (user?.username || username || "U")[0].toUpperCase();
 
   return (
-    <header className="flex items-center h-14 px-3 border-b border-white/[0.04] bg-[var(--color-bg-primary)] shrink-0">
+    <header className="flex items-center h-14 px-3 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)] shrink-0">
       {/* Menu button (mobile) */}
       <button
         onClick={onMenuClick}
-        className="lg:hidden p-2 rounded-lg text-white/50 hover:text-white/80 hover:bg-white/5 transition-colors"
+        className="lg:hidden p-2 rounded-lg text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors"
         aria-label="Open sidebar"
       >
         <Menu size={22} />
@@ -42,9 +42,9 @@ export function ChatHeader({
       {/* Title */}
       <div className="flex-1 flex items-center justify-center min-w-0 px-2">
         {isTemporary && (
-          <span className="text-white/20 mr-1.5 text-sm">👻</span>
+          <span className="text-[var(--color-text-muted)] mr-1.5 text-sm">👻</span>
         )}
-        <span className="text-white/60 text-[15px] font-medium truncate">
+        <span className="text-[var(--color-text-secondary)] text-[15px] font-medium truncate">
           {title}
         </span>
       </div>
@@ -59,12 +59,10 @@ export function ChatHeader({
 
         {/* Avatar */}
         <div className="ml-1 mr-1">
-          <div className="w-8 h-8 rounded-full gradient-bg p-[1.5px]">
-            <div className="w-full h-full rounded-full bg-[var(--color-bg-primary)] flex items-center justify-center">
-              <span className="text-white/70 text-xs font-semibold">
+          <div className="w-8 h-8 rounded-full bg-[var(--color-accent-blue)] flex items-center justify-center">
+              <span className="text-white text-xs font-semibold">
                 {initial}
               </span>
-            </div>
           </div>
         </div>
       </div>
@@ -196,7 +194,7 @@ function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 max-h-[400px] rounded-2xl bg-[#12121A] border border-white/[0.08] shadow-2xl overflow-hidden z-50">
+        <div className="absolute right-0 top-full mt-2 w-80 max-h-[400px] rounded-2xl bg-[var(--color-bg-elevated)] border border-[var(--color-border-default)] shadow-2xl overflow-hidden z-50">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
             <h3 className="text-white/70 text-sm font-semibold">Notifications</h3>
@@ -218,8 +216,8 @@ function NotificationBell() {
               </div>
             ) : notifications.length === 0 ? (
               <div className="py-8 text-center">
-                <Bell size={24} className="text-white/10 mx-auto mb-2" />
-                <p className="text-white/20 text-xs">No notifications</p>
+                <Bell size={24} className="text-white/20 mx-auto mb-2" />
+                <p className="text-white/30 text-xs">No notifications</p>
               </div>
             ) : (
               notifications.map((n) => (
@@ -231,16 +229,16 @@ function NotificationBell() {
                     <p className="text-white/70 text-[13px] font-medium truncate">
                       {n.title}
                     </p>
-                    <p className="text-white/30 text-[11px] mt-0.5 line-clamp-2">
+                    <p className="text-white/40 text-[11px] mt-0.5 line-clamp-2">
                       {n.body}
                     </p>
-                    <p className="text-white/15 text-[10px] mt-1">
+                    <p className="text-white/25 text-[10px] mt-1">
                       {timeAgo(n.created_at)}
                     </p>
                   </div>
                   <button
                     onClick={() => handleDelete(n.id)}
-                    className="hidden group-hover:block p-1 text-white/15 hover:text-red-400/60 transition-colors"
+                    className="hidden group-hover:block p-1 text-white/20 hover:text-red-400/60 transition-colors"
                   >
                     <X size={12} />
                   </button>
@@ -331,7 +329,7 @@ function ChatOptionsMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-[#12121A] border border-white/[0.08] shadow-2xl overflow-hidden z-50">
+        <div className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-[var(--color-bg-elevated)] border border-[var(--color-border-default)] shadow-2xl overflow-hidden z-50">
           {showRename ? (
             <div className="p-3 space-y-2">
               <input
@@ -357,7 +355,7 @@ function ChatOptionsMenu() {
                 </button>
                 <button
                   onClick={handleRename}
-                  className="flex-1 py-1.5 text-[11px] text-[#00BCD4] font-semibold rounded-lg hover:bg-[#00BCD4]/10 transition-colors"
+                  className="flex-1 py-1.5 text-[11px] text-[var(--color-accent-blue)] font-semibold rounded-lg hover:bg-[var(--color-accent-blue)]/10 transition-colors"
                 >
                   Save
                 </button>

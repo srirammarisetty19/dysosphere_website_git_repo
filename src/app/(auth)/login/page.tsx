@@ -116,7 +116,7 @@ function LoginPageInner() {
   };
 
   const inputClass =
-    "w-full pl-12 pr-4 py-4 bg-white/5 border border-transparent rounded-[14px] text-white text-[15px] placeholder:text-white/15 focus:border-[var(--color-accent-cyan)] focus:outline-none transition-colors disabled:opacity-50";
+    "w-full pl-12 pr-4 py-4 bg-white/[0.06] border border-[var(--color-border-default)] rounded-[14px] text-[var(--color-text-primary)] text-[15px] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent-blue)] focus:outline-none transition-colors disabled:opacity-50";
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--color-bg-primary)] px-6">
@@ -144,7 +144,7 @@ function LoginPageInner() {
             {/* Server URL */}
             <div className="relative">
               <Globe
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
                 size={18}
               />
               <input
@@ -180,7 +180,7 @@ function LoginPageInner() {
               id="login-connect"
               onClick={handleServerConnect}
               disabled={checkingServer}
-              className="w-full h-[52px] rounded-[14px] gradient-bg text-white font-semibold text-base tracking-wide hover:brightness-110 active:brightness-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+              className="w-full h-[52px] rounded-[14px] bg-[var(--color-accent-blue)] text-white font-semibold text-base tracking-wide hover:bg-[var(--color-accent-blue-hover)] active:brightness-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {checkingServer ? (
                 <Loader2 className="animate-spin" size={22} />
@@ -195,7 +195,7 @@ function LoginPageInner() {
             {/* Connected server indicator */}
             <div className="flex items-center gap-2 mb-5 px-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-white/30 text-xs">
+              <span className="text-[var(--color-text-muted)] text-xs">
                 Connected to{" "}
                 <span className="text-white/50 font-medium">
                   {serverUrl.replace(/^https?:\/\//, "")}
@@ -206,7 +206,7 @@ function LoginPageInner() {
                   setServerConnected(false);
                   setError(null);
                 }}
-                className="ml-auto text-white/20 text-xs hover:text-white/40 transition-colors"
+                className="ml-auto text-[var(--color-text-muted)] text-xs hover:text-[var(--color-text-tertiary)] transition-colors"
               >
                 Change
               </button>
@@ -216,7 +216,7 @@ function LoginPageInner() {
               {/* Username */}
               <div className="relative">
                 <User
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
                   size={18}
                 />
                 <input
@@ -234,7 +234,7 @@ function LoginPageInner() {
               {/* Password */}
               <div className="relative">
                 <Lock
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
                   size={18}
                 />
                 <input
@@ -246,7 +246,7 @@ function LoginPageInner() {
                   disabled={isLoading}
                   autoComplete="current-password"
                   onKeyDown={(e) => e.key === "Enter" && handleSubmit(e)}
-                  className="w-full pl-12 pr-12 py-4 bg-white/5 border border-transparent rounded-[14px] text-white text-[15px] placeholder:text-white/15 focus:border-[var(--color-accent-cyan)] focus:outline-none transition-colors disabled:opacity-50"
+                  className="w-full pl-12 pr-12 py-4 bg-white/[0.06] border border-[var(--color-border-default)] rounded-[14px] text-[var(--color-text-primary)] text-[15px] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent-blue)] focus:outline-none transition-colors disabled:opacity-50"
                 />
                 <button
                   type="button"
@@ -273,7 +273,7 @@ function LoginPageInner() {
                 id="login-submit"
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-[52px] rounded-[14px] gradient-bg text-white font-semibold text-base tracking-wide hover:brightness-110 active:brightness-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+                className="w-full h-[52px] rounded-[14px] bg-[var(--color-accent-blue)] text-white font-semibold text-base tracking-wide hover:bg-[var(--color-accent-blue-hover)] active:brightness-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isLoading ? (
                   <Loader2 className="animate-spin" size={22} />
@@ -287,11 +287,11 @@ function LoginPageInner() {
       </div>
 
       {/* Sign Up Link */}
-      <p className="mt-7 text-white/30 text-[13px]">
+      <p className="mt-7 text-[var(--color-text-muted)] text-[13px]">
         Don&apos;t have an account?{" "}
         <Link
           href={service ? `/register?service=${service}` : "/register"}
-          className="text-[var(--color-accent-teal)] font-semibold hover:underline"
+          className="text-[var(--color-accent-blue)] font-semibold hover:underline"
         >
           Sign up
         </Link>
@@ -300,7 +300,7 @@ function LoginPageInner() {
       {/* Back to Services */}
       <a
         href="/"
-        className="mt-3 text-white/20 text-[12px] hover:text-white/40 transition-colors inline-flex items-center gap-1.5"
+        className="mt-3 text-[var(--color-text-muted)] text-[12px] hover:text-[var(--color-text-tertiary)] transition-colors inline-flex items-center gap-1.5"
       >
         ← Back to Services
       </a>

@@ -12,7 +12,7 @@ import { apiClient } from "@/lib/api-client";
 import { ChatMessages } from "@/components/chat/chat-messages";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ChatHeader } from "@/components/chat/chat-header";
-import { Sparkles, Zap, Search, FileText, Brain, Globe, Scissors } from "lucide-react";
+import { Sparkles, Zap, Search, FileText, Brain, Globe, Scissors, Shield, ArrowRight } from "lucide-react";
 
 export default function ChatPage() {
   const { user } = useAuthStore();
@@ -181,92 +181,57 @@ function EmptyState({ username }: { username: string }) {
 
   const suggestions = [
     {
-      icon: <Brain size={18} />,
-      title: "Reason & Analyze",
+      icon: <Brain size={16} />,
       text: "Explain quantum computing in simple terms",
-      gradient: "from-purple-500/10 to-purple-500/5",
-      iconColor: "text-purple-400",
     },
     {
-      icon: <FileText size={18} />,
-      title: "Write & Create",
+      icon: <FileText size={16} />,
       text: "Help me write a professional email",
-      gradient: "from-sky-500/10 to-sky-500/5",
-      iconColor: "text-sky-400",
     },
     {
-      icon: <Search size={18} />,
-      title: "Search & Find",
+      icon: <Search size={16} />,
       text: "Search my documents for the latest report",
-      gradient: "from-green-500/10 to-green-500/5",
-      iconColor: "text-green-400",
     },
     {
-      icon: <Globe size={18} />,
-      title: "Browse & Research",
+      icon: <Globe size={16} />,
       text: "What are the latest developments in AI?",
-      gradient: "from-amber-500/10 to-amber-500/5",
-      iconColor: "text-amber-400",
     },
   ];
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 pb-20">
-      {/* Animated logo */}
-      <div className="relative mb-8">
-        <div className="w-16 h-16 rounded-2xl gradient-bg p-[1.5px] shadow-lg shadow-[var(--color-accent-cyan)]/10">
-          <div className="w-full h-full rounded-[14px] bg-[var(--color-bg-primary)] flex items-center justify-center">
-            <Sparkles size={28} className="text-[var(--color-accent-cyan)]" />
-          </div>
-        </div>
-        {/* Subtle glow */}
-        <div className="absolute inset-0 w-16 h-16 rounded-2xl gradient-bg opacity-20 blur-xl" />
-      </div>
-
       {/* Greeting */}
       <div className="text-center mb-10">
-        <h2 className="text-2xl font-semibold text-white/80 mb-2">
+        <h2 className="text-[28px] font-semibold text-[var(--color-text-primary)] mb-3 tracking-tight">
           Hello, {username}
         </h2>
-        <p className="text-white/30 text-sm max-w-md">
-          I can help you think, create, search, and browse — all processed
-          privately on your SphereX device.
+        <p className="text-[var(--color-text-tertiary)] text-[15px] max-w-md leading-relaxed">
+          Your private AI assistant — everything is processed locally on your SphereX device.
         </p>
       </div>
 
-      {/* Suggestion Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl w-full">
+      {/* Suggestion prompts — clean, text-forward */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-xl w-full">
         {suggestions.map((s, i) => (
           <button
             key={i}
             onClick={() => sendMessage(s.text)}
-            className={`text-left p-4 rounded-2xl bg-gradient-to-br ${s.gradient} border border-white/[0.06] hover:border-white/[0.12] transition-all duration-200 group hover:scale-[1.02] active:scale-[0.98]`}
+            className="group flex items-center gap-3 text-left px-4 py-3.5 rounded-xl bg-[var(--color-bg-tertiary)] border border-[var(--color-border-subtle)] hover:border-[var(--color-border-default)] hover:bg-[var(--color-bg-elevated)] transition-all duration-200"
           >
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className={`${s.iconColor} opacity-60 group-hover:opacity-100 transition-opacity`}>
-                {s.icon}
-              </div>
-              <span className="text-white/50 text-[13px] font-semibold group-hover:text-white/70 transition-colors">
-                {s.title}
-              </span>
-            </div>
-            <span className="text-white/35 text-sm group-hover:text-white/55 transition-colors leading-relaxed">
+            <span className="text-[var(--color-text-muted)] group-hover:text-[var(--color-text-tertiary)] transition-colors shrink-0">
+              {s.icon}
+            </span>
+            <span className="text-[var(--color-text-tertiary)] text-[13px] group-hover:text-[var(--color-text-secondary)] transition-colors leading-snug">
               {s.text}
             </span>
           </button>
         ))}
       </div>
 
-      {/* Capability chips */}
-      <div className="flex flex-wrap items-center justify-center gap-2 mt-8">
-        {["Agentic AI", "Tool Use", "Web Search", "File Analysis", "Voice Input"].map((cap) => (
-          <span
-            key={cap}
-            className="px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.06] text-white/20 text-[11px] font-medium"
-          >
-            {cap}
-          </span>
-        ))}
+      {/* Privacy assurance — reinforces trust */}
+      <div className="flex items-center gap-2 mt-8 text-[var(--color-text-muted)]">
+        <Shield size={13} />
+        <span className="text-[11px]">All data stays on your device</span>
       </div>
     </div>
   );

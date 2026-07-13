@@ -1,1 +1,4 @@
-{}
+{
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/api/[...proxy]/route": "app/api/[...proxy]/route.js"
+}
