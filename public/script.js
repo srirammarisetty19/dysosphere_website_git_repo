@@ -110,8 +110,12 @@ demoTabs.forEach(tab => {
   });
 });
 
-// Start auto-rotation on page load
-startAutoRotation();
+// First slide: wait for AI demos to finish (~4s) + reading pause (~6s) = ~10s, then slide to NAS
+// After that, start regular 10s rotation cycle
+setTimeout(() => {
+  switchToTab('nas');
+  startAutoRotation();
+}, 10000);
 
 // ── NAS Demo 1: Search + Photo Grid ─────────────────────
 function runNasSearchDemo() {
