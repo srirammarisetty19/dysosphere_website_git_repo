@@ -1,10 +1,18 @@
 // ── Hero typewriter rotation ─────────────────────────────
-const rotateWords = ['Enterprise AI','NAS Storage','Photo Search','Document AI','Personal AI'];
+const typewriterWrapper = document.getElementById('heroRotate');
+const typewriterEl = typewriterWrapper ? typewriterWrapper.querySelector('.typewriter-text') : null;
+let rotateWords = [];
+if (typewriterWrapper && typewriterWrapper.dataset.words) {
+  try {
+    rotateWords = JSON.parse(typewriterWrapper.dataset.words);
+  } catch (e) {
+    rotateWords = ['Infrastructure.', 'Privacy.', 'Intelligence.', 'Sovereignty.'];
+  }
+}
 let wordIndex = 0;
-const typewriterEl = document.getElementById('hero-typewriter');
 
 function typeNextWord() {
-  if (!typewriterEl) return;
+  if (!typewriterEl || rotateWords.length === 0) return;
   const word = rotateWords[wordIndex];
   wordIndex = (wordIndex + 1) % rotateWords.length;
   
@@ -29,7 +37,7 @@ function typeNextWord() {
   }, 40);
 }
 
-if (typewriterEl) setTimeout(typeNextWord, 3000);
+if (typewriterEl) setTimeout(typeNextWord, 1000);
 
 // ── Chat typing simulation ──────────────────────────────
 function triggerTypingReply(typingId, replyId, delay) {
@@ -134,8 +142,8 @@ carouselDots.forEach(dot => {
   });
 });
 
-// Start auto-advance after AI typing completes (~5s)
-setTimeout(() => startCarousel(), 5000);
+// Start auto-advance immediately to sync with the progress bar
+startCarousel();
 
 // ── NAS Demo 1: Search + Photo Grid ─────────────────────
 function runNasSearchDemo() {
