@@ -1,121 +1,141 @@
-/* SphereX by DysoSphere — Multi-page Script */
+// ── Hero typewriter rotation ─────────────────────────────
+const rotateWords = ['Enterprise AI','NAS Storage','Photo Search','Document AI','Personal AI'];
+let wordIndex = 0;
+const typewriterEl = document.getElementById('hero-typewriter');
 
-// ── Navbar scroll ────────────────────────────────────────
-const navbar = document.getElementById('navbar');
-if (navbar) {
-  window.addEventListener('scroll', () => navbar.classList.toggle('scrolled', scrollY > 40));
+function typeNextWord() {
+  if (!typewriterEl) return;
+  const word = rotateWords[wordIndex];
+  wordIndex = (wordIndex + 1) % rotateWords.length;
+  
+  // Delete current text
+  let currentText = typewriterEl.textContent;
+  const deleteInterval = setInterval(() => {
+    currentText = currentText.slice(0, -1);
+    typewriterEl.textContent = currentText;
+    if (currentText.length === 0) {
+      clearInterval(deleteInterval);
+      // Type new word
+      let charIdx = 0;
+      const typeInterval = setInterval(() => {
+        charIdx++;
+        typewriterEl.textContent = word.slice(0, charIdx);
+        if (charIdx >= word.length) {
+          clearInterval(typeInterval);
+          setTimeout(typeNextWord, 2800);
+        }
+      }, 80);
+    }
+  }, 40);
 }
 
-// ── Mobile toggle ────────────────────────────────────────
-const navToggle = document.getElementById('navToggle');
-const navLinks = document.getElementById('navLinks');
-if (navToggle && navLinks) {
-  navToggle.addEventListener('click', () => {
-    navLinks.classList.toggle('open');
-  });
-}
+if (typewriterEl) setTimeout(typeNextWord, 3000);
 
-// ── Smooth scroll for same-page anchors ──────────────────
-document.querySelectorAll('a[href^="#"]').forEach(a => a.addEventListener('click', e => {
-  const href = a.getAttribute('href');
-  if (href === '#') return;
-  e.preventDefault();
-  const t = document.querySelector(href);
-  if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  if (navLinks) navLinks.classList.remove('open');
-}));
-
-// ── Close mobile nav on link click ───────────────────────
-document.querySelectorAll('.nav-links a').forEach(a => {
-  a.addEventListener('click', () => {
-    if (navLinks) navLinks.classList.remove('open');
-  });
-});
-
-// ── Chat typing animation (Home page) ───────────────────
+// ── Chat typing simulation ──────────────────────────────
 function triggerTypingReply(typingId, replyId, delay) {
-  const typing = document.getElementById(typingId);
-  const reply = document.getElementById(replyId);
-  if (typing && reply) {
-    typing.style.display = 'flex';
-    reply.style.display = 'none';
-    setTimeout(() => {
-      typing.style.display = 'none';
-      reply.style.display = 'block';
-      reply.style.animation = 'fadeInUp 0.4s ease';
-    }, delay);
-  }
+  const typingEl = document.getElementById(typingId);
+  const replyEl = document.getElementById(replyId);
+  if (!typingEl || !replyEl) return;
+  
+  setTimeout(() => {
+    typingEl.style.display = 'none';
+    replyEl.style.display = 'block';
+    replyEl.style.animation = 'fadeInUp 0.4s ease';
+  }, delay);
 }
 
 // Trigger AI demos on load
 setTimeout(() => triggerTypingReply('typing1', 'reply1', 2200), 1200);
-setTimeout(() => triggerTypingReply('typing2', 'reply2', 2800), 1200);
 
-// ── Demo tab switching + auto-rotation ──────────────────
-let nasTriggered = false;
-const demoTabs = document.querySelectorAll('.demo-tab');
-const tabOrder = ['ai', 'nas'];
-let currentTabIndex = 0;
-let autoRotateTimer = null;
-let pauseTimeout = null;
 
-function switchToTab(tabName) {
-  // Update active tab
-  demoTabs.forEach(t => {
-    t.classList.remove('active');
-    // Reset progress bar animation via reflow
-    const bar = t.querySelector('.demo-tab-progress');
-    if (bar) { bar.style.animation = 'none'; bar.offsetHeight; bar.style.animation = ''; }
-  });
+// ── Demo Carousel ───────────────────────────────────────
+const carouselTrack = document.getElementById('carouselTrack');
+const carouselLabel = document.getElementById('carouselLabel');
+const carouselDots = document.querySelectorAll('.demo-dot');
+const progressBar = document.getElementById('carouselProgressBar');
+const slideLabels = [
+  '\u{1F916} Your Enterprise AI Assistant',
+  '\u{1F4BE} Intelligent NAS Search',
+  '\u{1F916} Your Personal AI Assistant',
+  '\u{1F4BE} In-Place AI Analysis'
+];
+const SLIDE_DURATION = 8000;
+let currentSlide = 0;
+let carouselTimer = null;
+let carouselPauseTimeout = null;
+let nasSearchTriggered = false;
+let nasAiTriggered = false;
+let personalAiTriggered = false;
+
+function resetProgressBar() {
+  if (!progressBar) return;
+  progressBar.classList.remove('running');
+  progressBar.offsetHeight; // reflow
+  progressBar.classList.add('running');
+}
+
+function goToSlide(index) {
+  currentSlide = index;
+  if (carouselTrack) carouselTrack.style.transform = 'translateX(-' + (index * 100) + '%)';
   
-  const targetTab = document.querySelector('.demo-tab[data-tab="' + tabName + '"]');
-  if (targetTab) targetTab.classList.add('active');
-
-  // Show correct panel
-  document.querySelectorAll('.demo-tab-panel').forEach(p => p.classList.remove('active'));
-  const panel = document.getElementById('panel-' + tabName);
-  if (panel) panel.classList.add('active');
-
-  // Trigger NAS mockup animations on first visit
-  if (tabName === 'nas' && !nasTriggered) {
-    nasTriggered = true;
-    runNasSearchDemo();
-    runNasAiDemo();
+  // Update label with fade
+  if (carouselLabel) {
+    carouselLabel.style.opacity = '0';
+    setTimeout(() => {
+      carouselLabel.textContent = slideLabels[index];
+      carouselLabel.style.opacity = '1';
+    }, 200);
   }
 
-  // Update index
-  currentTabIndex = tabOrder.indexOf(tabName);
-  if (currentTabIndex === -1) currentTabIndex = 0;
+  // Update dots
+  carouselDots.forEach((dot, i) => {
+    dot.classList.toggle('active', i === index);
+  });
+
+  // Reset progress bar
+  resetProgressBar();
+
+  // Trigger NAS animations on first visit
+  if (index === 1 && !nasSearchTriggered) {
+    nasSearchTriggered = true;
+    runNasSearchDemo();
+  }
+  if (index === 2 && !personalAiTriggered) {
+    personalAiTriggered = true;
+    triggerTypingReply('typing2', 'reply2', 2800);
+  }
+  if (index === 3 && !nasAiTriggered) {
+    nasAiTriggered = true;
+    runNasAiDemo();
+  }
 }
 
-function startAutoRotation() {
-  stopAutoRotation();
-  autoRotateTimer = setInterval(() => {
-    currentTabIndex = (currentTabIndex + 1) % tabOrder.length;
-    switchToTab(tabOrder[currentTabIndex]);
-  }, 10000);
+function startCarousel() {
+  stopCarousel();
+  resetProgressBar();
+  carouselTimer = setInterval(() => {
+    goToSlide((currentSlide + 1) % 4);
+  }, SLIDE_DURATION);
 }
 
-function stopAutoRotation() {
-  if (autoRotateTimer) { clearInterval(autoRotateTimer); autoRotateTimer = null; }
+function stopCarousel() {
+  if (carouselTimer) { clearInterval(carouselTimer); carouselTimer = null; }
+  if (progressBar) progressBar.classList.remove('running');
 }
 
-// Manual tab click — switch + pause auto-rotation for 30s
-demoTabs.forEach(tab => {
-  tab.addEventListener('click', () => {
-    switchToTab(tab.dataset.tab);
-    stopAutoRotation();
-    if (pauseTimeout) clearTimeout(pauseTimeout);
-    pauseTimeout = setTimeout(() => startAutoRotation(), 30000);
+// Dot click — jump to slide + pause
+carouselDots.forEach(dot => {
+  dot.addEventListener('click', () => {
+    goToSlide(parseInt(dot.dataset.slide));
+    stopCarousel();
+    resetProgressBar();
+    if (carouselPauseTimeout) clearTimeout(carouselPauseTimeout);
+    carouselPauseTimeout = setTimeout(() => startCarousel(), 20000);
   });
 });
 
-// First slide: wait for AI demos to finish (~4s) + reading pause (~6s) = ~10s, then slide to NAS
-// After that, start regular 10s rotation cycle
-setTimeout(() => {
-  switchToTab('nas');
-  startAutoRotation();
-}, 10000);
+// Start auto-advance after AI typing completes (~5s)
+setTimeout(() => startCarousel(), 5000);
 
 // ── NAS Demo 1: Search + Photo Grid ─────────────────────
 function runNasSearchDemo() {
@@ -217,77 +237,17 @@ const revealObserver = new IntersectionObserver(entries => {
   entries.forEach(e => {
     if (e.isIntersecting) {
       e.target.classList.add('visible');
+      revealObserver.unobserve(e.target);
     }
   });
-}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+}, { threshold: 0.15 });
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
-document.querySelectorAll('.reveal').forEach((el, i) => {
-  el.style.transitionDelay = `${(i % 6) * 0.08}s`;
-  revealObserver.observe(el);
+// ── Navbar scroll effect ─────────────────────────────────
+const navbar = document.querySelector('.navbar');
+window.addEventListener('scroll', () => {
+  if (navbar) navbar.classList.toggle('scrolled', window.scrollY > 30);
 });
-
-
-
-
-// ── Active nav link highlight ────────────────────────────
-const currentPage = window.location.pathname.split('/').pop() || 'index.html';
-document.querySelectorAll('.nav-links a:not(.nav-cta)').forEach(link => {
-  const href = link.getAttribute('href');
-  if (href === currentPage) {
-    link.classList.add('active');
-  } else {
-    link.classList.remove('active');
-  }
-});
-
-// ── Hero typewriter animation ────────────────────────────
-const heroRotate = document.getElementById('heroRotate');
-if (heroRotate) {
-  const words = JSON.parse(heroRotate.dataset.words);
-  const textEl = heroRotate.querySelector('.typewriter-text');
-  let wordIndex = 0;
-  let charIndex = 0;
-  let isDeleting = false;
-  
-  const typeSpeed = 80;    // ms per character when typing
-  const deleteSpeed = 40;  // ms per character when deleting
-  const pauseAfterType = 1800; // pause after full word typed
-  const pauseAfterDelete = 300; // pause before typing next word
-  
-  function tick() {
-    const currentWordStr = words[wordIndex];
-    
-    if (!isDeleting) {
-      // Typing
-      charIndex++;
-      textEl.textContent = currentWordStr.substring(0, charIndex);
-      
-      if (charIndex === currentWordStr.length) {
-        // Full word typed — pause, then start deleting
-        isDeleting = true;
-        setTimeout(tick, pauseAfterType);
-        return;
-      }
-      setTimeout(tick, typeSpeed);
-    } else {
-      // Deleting
-      charIndex--;
-      textEl.textContent = currentWordStr.substring(0, charIndex);
-      
-      if (charIndex === 0) {
-        // Fully deleted — move to next word
-        isDeleting = false;
-        wordIndex = (wordIndex + 1) % words.length;
-        setTimeout(tick, pauseAfterDelete);
-        return;
-      }
-      setTimeout(tick, deleteSpeed);
-    }
-  }
-  
-  // Start typing the first word after a short delay
-  setTimeout(tick, 500);
-}
 
 // ── Animated stats counter ───────────────────────────────
 const statItems = document.querySelectorAll('.stat-item[data-count-type]');
@@ -300,30 +260,41 @@ if (statItems.length) {
         const numberEl = entry.target.querySelector('.stat-number');
         
         if (type === 'number') {
+          // Count UP from 0 to target
           const target = parseInt(entry.target.dataset.countTarget, 10);
           const suffix = entry.target.dataset.countSuffix || '';
+          const prefix = entry.target.dataset.countPrefix || '';
           const duration = 1800;
           const startTime = performance.now();
           
           const animate = (now) => {
             const elapsed = now - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            // Ease out cubic
             const eased = 1 - Math.pow(1 - progress, 3);
             const current = Math.round(target * eased);
-            numberEl.textContent = current + suffix;
+            numberEl.textContent = prefix + current + suffix;
             if (progress < 1) requestAnimationFrame(animate);
           };
           requestAnimationFrame(animate);
-        } else if (type === 'pulse') {
-          // Quick scale pulse effect
-          numberEl.style.transition = 'transform 0.4s ease';
-          numberEl.style.transform = 'scale(1.2)';
-          setTimeout(() => {
-            numberEl.style.transform = 'scale(1)';
-          }, 400);
+        } else if (type === 'countdown') {
+          // Count DOWN from start to target
+          const start = parseInt(entry.target.dataset.countStart, 10);
+          const target = parseInt(entry.target.dataset.countTarget, 10);
+          const suffix = entry.target.dataset.countSuffix || '';
+          const prefix = entry.target.dataset.countPrefix || '';
+          const duration = 2000;
+          const startTime = performance.now();
+          
+          const animate = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const current = Math.round(start - (start - target) * eased);
+            numberEl.textContent = prefix + current + suffix;
+            if (progress < 1) requestAnimationFrame(animate);
+          };
+          requestAnimationFrame(animate);
         }
-        // 'static' type: no animation needed, just show label
       }
     });
   }, { threshold: 0.3 });

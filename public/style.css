@@ -399,20 +399,24 @@ ul{list-style:none}
 
 .page-hero-content{position:relative;z-index:2;max-width:760px;margin:0 auto}
 
-/* ═══════ DEMO TABS ═══════ */
-.demo-tabs{display:flex;justify-content:center;gap:8px;margin-bottom:24px}
-.demo-tab{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:999px;padding:10px 24px;font-size:.82rem;font-weight:600;letter-spacing:.5px;color:var(--text-3);cursor:pointer;transition:all .25s ease;font-family:var(--font-body);position:relative;overflow:hidden}
-.demo-tab:hover{color:var(--text-1);border-color:var(--border-hover);background:rgba(255,255,255,0.06)}
-.demo-tab.active{background:var(--accent-dim);border-color:var(--brand);color:var(--brand)}
-.demo-tab-progress{position:absolute;bottom:0;left:0;height:2px;background:var(--brand);width:0;border-radius:0 0 999px 999px;transition:none}
-.demo-tab.active .demo-tab-progress{animation:tabProgress 10s linear forwards}
-@keyframes tabProgress{from{width:0}to{width:100%}}
-.demo-tab-panel{display:none;animation:fadeInUp .4s ease}
-.demo-tab-panel.active{display:block}
+/* ═══════ DEMO CAROUSEL ═══════ */
+.demo-carousel{max-width:720px;margin:0 auto}
+.demo-carousel-label{text-align:center;font-size:1rem;font-weight:700;color:var(--text);margin-bottom:16px;min-height:1.4em;transition:opacity .3s ease;font-family:var(--font)}
+.demo-carousel-viewport{overflow:hidden;border-radius:var(--r-lg)}
+.demo-carousel-track{display:flex;transition:transform .5s cubic-bezier(.4,0,.2,1)}
+.demo-slide{width:100%;flex-shrink:0;padding:0 4px}
+.demo-slide .chat-window{min-height:340px}
+.demo-carousel-dots{display:flex;justify-content:center;gap:10px;margin-top:18px}
+.demo-dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--text-3);background:transparent;cursor:pointer;padding:0;transition:all .25s ease}
+.demo-dot:hover{border-color:var(--brand-light)}
+.demo-dot.active{background:var(--brand);border-color:var(--brand);box-shadow:0 0 8px rgba(52,118,252,0.4)}
+.demo-carousel-progress{width:200px;height:3px;background:rgba(255,255,255,0.06);border-radius:3px;margin:14px auto 0;overflow:hidden}
+.demo-carousel-progress-bar{height:100%;background:var(--brand);width:0;border-radius:3px;transition:none}
+.demo-carousel-progress-bar.running{animation:carouselProgress 8s linear forwards}
+@keyframes carouselProgress{from{width:0}to{width:100%}}
 
-/* ═══════ DUAL CHAT DEMOS (HOME) ═══════ */
+/* Legacy — keep for other pages */
 .dual-chat-demos{display:grid;grid-template-columns:1fr 1fr;gap:28px;max-width:1080px;margin:0 auto}
-.dual-chat-demos .chat-window{flex:1}
 .chat-label{font-size:.72rem;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--brand);margin-bottom:10px;display:block;text-align:center}
 
 /* NAS Mockup — App-like demo */
