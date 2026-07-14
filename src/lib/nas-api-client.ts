@@ -25,6 +25,7 @@ import type {
   SyncDirection,
   SyncDeletePolicy,
 } from "./nas-types";
+import { apiClient } from "./api-client";
 
 class NasApiClientError extends Error {
   status: number;
@@ -122,6 +123,34 @@ class NasApiClient {
     const url = this.resolveUrl(path);
 
     const response = await fetch(url, { ...options, headers });
+
+    // ── 401 Handling — delegate to AI client's centralized refresh ────
+    // The AI client owns the token lifecycle (refresh, rotation, cross-tab
+    // sync, force-logout). On 401 we ask it to refresh, then retry once.
+    if (response.status === 401) {
+      const refreshed = await apiClient.tryRefreshToken();
+      if (refreshed) {
+        // AI client refreshed the token — sync it to our instance
+        this.token = apiClient.getToken();
+        headers["Authorization"] = `Bearer ${this.token}`;
+        const retryResponse = await fetch(url, { ...options, headers });
+        if (!retryResponse.ok) {
+          let message = `Server error (${retryResponse.status})`;
+          try {
+            const data = await retryResponse.json();
+            if (typeof data.detail === "string") message = data.detail;
+            else if (data.message) message = data.message;
+          } catch { /* non-JSON */ }
+          throw new NasApiClientError(message, retryResponse.status);
+        }
+        const ct = retryResponse.headers.get("content-type") || "";
+        if (ct.includes("application/json")) return retryResponse.json();
+        return retryResponse.text() as unknown as T;
+      }
+      // Refresh failed — session is dead, force logout
+      apiClient.forceLogout();
+      throw new NasApiClientError("Session expired. Please sign in again.", 401);
+    }
 
     if (!response.ok) {
       let message = `Server error (${response.status})`;

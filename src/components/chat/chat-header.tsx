@@ -6,7 +6,9 @@
 // ============================================================================
 
 import { useState, useRef, useEffect } from "react";
-import { Menu, Bell, MoreHorizontal, Pencil, Pin, Trash2, X, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Menu, Bell, MoreHorizontal, Pencil, Pin, Trash2, X, Loader2, Settings, LogOut, ChevronRight } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useChatStore } from "@/stores/chat-store";
 import { apiClient } from "@/lib/api-client";
@@ -26,7 +28,8 @@ export function ChatHeader({
   onMenuClick,
 }: ChatHeaderProps) {
   const { user } = useAuthStore();
-  const initial = (user?.username || username || "U")[0].toUpperCase();
+  // 'initial' is now used inside <UserAccountMenu />
+  void user; // suppress lint
 
   return (
     <header className="flex items-center h-14 px-3 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)] shrink-0">
@@ -57,14 +60,8 @@ export function ChatHeader({
         {/* More options */}
         <ChatOptionsMenu />
 
-        {/* Avatar */}
-        <div className="ml-1 mr-1">
-          <div className="w-8 h-8 rounded-full bg-[var(--color-accent-blue)] flex items-center justify-center">
-              <span className="text-white text-xs font-semibold">
-                {initial}
-              </span>
-          </div>
-        </div>
+        {/* Account Menu */}
+        <UserAccountMenu />
       </div>
     </header>
   );
@@ -390,6 +387,101 @@ function ChatOptionsMenu() {
               </button>
             </>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── User Account Menu (top-right avatar → dropdown) ─────────────────────
+function UserAccountMenu() {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { user, activeAccount, logout } = useAuthStore();
+
+  const initial = (user?.username || "U")[0].toUpperCase();
+  const serverUrl = activeAccount?.serverUrl || "";
+  const displayServer = serverUrl.replace(/^https?:\/\//, "");
+
+  // Close on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [isOpen]);
+
+  const handleSignOut = async () => {
+    setIsOpen(false);
+    await logout();
+    router.replace("/login");
+  };
+
+  return (
+    <div className="relative ml-1 mr-1" ref={menuRef}>
+      {/* Avatar Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-8 h-8 rounded-full bg-[var(--color-accent-blue)] flex items-center justify-center hover:ring-2 hover:ring-[var(--color-accent-blue)]/40 transition-all cursor-pointer"
+        aria-label="Account menu"
+      >
+        <span className="text-white text-xs font-semibold">{initial}</span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-[var(--color-bg-elevated)] border border-[var(--color-border-default)] shadow-2xl overflow-hidden z-50">
+          {/* User Info */}
+          <div className="px-4 py-4 border-b border-white/[0.06]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00BCD4] to-[#7C4DFF] flex items-center justify-center shrink-0">
+                <span className="text-white font-bold text-sm">{initial}</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-white text-sm font-semibold truncate">
+                  {user?.username || "User"}
+                </p>
+                {user?.email && (
+                  <p className="text-white/30 text-[11px] truncate">{user.email}</p>
+                )}
+              </div>
+            </div>
+            {displayServer && (
+              <div className="mt-2.5 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
+                <span className="text-white/20 text-[10px] truncate font-mono">
+                  {displayServer}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Menu Items */}
+          <div className="py-1">
+            <Link
+              href="/settings"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-white/60 hover:bg-white/[0.04] transition-colors text-sm"
+            >
+              <Settings size={15} />
+              Settings
+              <ChevronRight size={13} className="ml-auto text-white/15" />
+            </Link>
+          </div>
+
+          {/* Sign Out */}
+          <div className="border-t border-white/[0.06] py-1">
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400/70 hover:bg-red-500/5 transition-colors text-sm"
+            >
+              <LogOut size={15} />
+              Sign Out
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -514,7 +514,12 @@ class ApiClient {
     return response.json();
   }
 
-  private async tryRefreshToken(): Promise<boolean> {
+  /**
+   * Attempt to silently refresh the access token using the stored refresh token.
+   * Public so that other API clients (e.g. NAS) can delegate 401 handling here
+   * instead of duplicating the refresh logic.
+   */
+  async tryRefreshToken(): Promise<boolean> {
     // Guard against concurrent refresh attempts (e.g. interval + visibility
     // handler firing at the same time). Google uses a similar mutex.
     if (this.isRefreshing) return false;
@@ -564,6 +569,16 @@ class ApiClient {
       this.isRefreshing = false;
     }
     return false;
+  }
+
+  /**
+   * Force logout — clears auth state and redirects to login.
+   * Public so that other API clients (e.g. NAS) can trigger force-logout
+   * when token refresh fails, without accessing private callbacks directly.
+   */
+  forceLogout(): void {
+    this.broadcastForceLogout();
+    this.forceLogoutCallback?.();
   }
 
   /**

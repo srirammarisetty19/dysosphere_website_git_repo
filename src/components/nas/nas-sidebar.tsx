@@ -5,10 +5,11 @@
 // Persistent on desktop, slide-over on mobile
 // ============================================================================
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { nasApiClient } from "@/lib/nas-api-client";
+import { useAuthStore } from "@/stores/auth-store";
 import { formatBytes } from "@/lib/nas-types";
 import {
   Home,
@@ -26,6 +27,7 @@ import {
   ChevronRight,
   PanelLeftClose,
   FolderSync,
+  LogOut,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -38,6 +40,8 @@ interface NasSidebarProps {
 
 export function NasSidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse }: NasSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useAuthStore();
   const [storageUsed, setStorageUsed] = useState(0);
   const [storageLimit, setStorageLimit] = useState(1);
   const [storageBreakdown, setStorageBreakdown] = useState<
@@ -75,7 +79,13 @@ export function NasSidebar({ isOpen, onClose, isCollapsed = false, onToggleColla
     return () => clearInterval(interval);
   }, [loadStats, loadUnreadCount]);
 
+  const handleSignOut = async () => {
+    await logout();
+    router.replace("/login");
+  };
+
   const progress = Math.min(storageUsed / storageLimit, 1);
+  const initial = (user?.username || "U")[0].toUpperCase();
 
   const mainNav = [
     { href: "/nas", icon: Home, label: "Home", exact: true },
@@ -220,6 +230,30 @@ export function NasSidebar({ isOpen, onClose, isCollapsed = false, onToggleColla
             </Link>
           ))}
         </nav>
+
+        {/* User Account Section — Google Drive pattern */}
+        <div className="border-t border-border-subtle px-4 py-3 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#00BCD4] to-[#7C4DFF] flex items-center justify-center shrink-0">
+              <span className="text-white font-bold text-xs">{initial}</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-text-primary text-sm font-semibold truncate">
+                {user?.username || "User"}
+              </p>
+              {user?.email && (
+                <p className="text-text-tertiary text-[10px] truncate">{user.email}</p>
+              )}
+            </div>
+            <button
+              onClick={handleSignOut}
+              title="Sign Out"
+              className="p-2 rounded-lg text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
 
         {/* Storage Footer — Google Drive style */}
         <div className="border-t border-border-subtle p-4">

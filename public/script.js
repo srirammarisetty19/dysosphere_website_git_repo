@@ -51,28 +51,162 @@ function triggerTypingReply(typingId, replyId, delay) {
 setTimeout(() => triggerTypingReply('typing1', 'reply1', 2200), 1200);
 setTimeout(() => triggerTypingReply('typing2', 'reply2', 2800), 1200);
 
-// ── Demo tab switching ──────────────────────────────────
+// ── Demo tab switching + auto-rotation ──────────────────
 let nasTriggered = false;
-document.querySelectorAll('.demo-tab').forEach(tab => {
+const demoTabs = document.querySelectorAll('.demo-tab');
+const tabOrder = ['ai', 'nas'];
+let currentTabIndex = 0;
+let autoRotateTimer = null;
+let pauseTimeout = null;
+
+function switchToTab(tabName) {
+  // Update active tab
+  demoTabs.forEach(t => {
+    t.classList.remove('active');
+    // Reset progress bar animation via reflow
+    const bar = t.querySelector('.demo-tab-progress');
+    if (bar) { bar.style.animation = 'none'; bar.offsetHeight; bar.style.animation = ''; }
+  });
+  
+  const targetTab = document.querySelector('.demo-tab[data-tab="' + tabName + '"]');
+  if (targetTab) targetTab.classList.add('active');
+
+  // Show correct panel
+  document.querySelectorAll('.demo-tab-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('panel-' + tabName);
+  if (panel) panel.classList.add('active');
+
+  // Trigger NAS mockup animations on first visit
+  if (tabName === 'nas' && !nasTriggered) {
+    nasTriggered = true;
+    runNasSearchDemo();
+    runNasAiDemo();
+  }
+
+  // Update index
+  currentTabIndex = tabOrder.indexOf(tabName);
+  if (currentTabIndex === -1) currentTabIndex = 0;
+}
+
+function startAutoRotation() {
+  stopAutoRotation();
+  autoRotateTimer = setInterval(() => {
+    currentTabIndex = (currentTabIndex + 1) % tabOrder.length;
+    switchToTab(tabOrder[currentTabIndex]);
+  }, 10000);
+}
+
+function stopAutoRotation() {
+  if (autoRotateTimer) { clearInterval(autoRotateTimer); autoRotateTimer = null; }
+}
+
+// Manual tab click — switch + pause auto-rotation for 30s
+demoTabs.forEach(tab => {
   tab.addEventListener('click', () => {
-    // Update active tab
-    document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    
-    // Show correct panel
-    const target = tab.dataset.tab;
-    document.querySelectorAll('.demo-tab-panel').forEach(p => p.classList.remove('active'));
-    const panel = document.getElementById('panel-' + target);
-    if (panel) panel.classList.add('active');
-    
-    // Trigger NAS typing animations on first visit
-    if (target === 'nas' && !nasTriggered) {
-      nasTriggered = true;
-      triggerTypingReply('typing3', 'reply3', 2000);
-      triggerTypingReply('typing4', 'reply4', 2600);
-    }
+    switchToTab(tab.dataset.tab);
+    stopAutoRotation();
+    if (pauseTimeout) clearTimeout(pauseTimeout);
+    pauseTimeout = setTimeout(() => startAutoRotation(), 30000);
   });
 });
+
+// Start auto-rotation on page load
+startAutoRotation();
+
+// ── NAS Demo 1: Search + Photo Grid ─────────────────────
+function runNasSearchDemo() {
+  const searchText = 'beach photos from Goa trip';
+  const typingEl = document.getElementById('nas-search-typing');
+  const cursorEl = document.getElementById('nas-search-cursor');
+  const sparkleEl = document.getElementById('nas-search-sparkle');
+  const resultsEl = document.getElementById('nas-search-results');
+  const labelEl = document.getElementById('nas-results-label');
+  const metaEl = document.getElementById('nas-meta');
+
+  if (!typingEl) return;
+
+  let charIdx = 0;
+  // Step 1: Type search text
+  function typeChar() {
+    if (charIdx < searchText.length) {
+      charIdx++;
+      typingEl.textContent = searchText.substring(0, charIdx);
+      setTimeout(typeChar, 55 + Math.random() * 40);
+    } else {
+      // Step 2: Sparkle pulses
+      if (cursorEl) cursorEl.style.display = 'none';
+      if (sparkleEl) sparkleEl.classList.add('pulse');
+      
+      // Step 3: Show results area
+      setTimeout(() => {
+        if (sparkleEl) sparkleEl.classList.remove('pulse');
+        if (resultsEl) resultsEl.style.display = 'flex';
+        if (labelEl) { labelEl.style.display = 'flex'; }
+        
+        // Step 4: Fade in photos one by one
+        [1, 2, 3, 4].forEach((n, i) => {
+          setTimeout(() => {
+            const photo = document.getElementById('nas-photo-' + n);
+            if (photo) {
+              photo.style.opacity = '1';
+              photo.style.animation = 'fadeInUp 0.4s ease';
+            }
+          }, i * 200);
+        });
+
+        // Step 5: Show meta
+        setTimeout(() => {
+          if (metaEl) { metaEl.style.display = 'block'; }
+        }, 1200);
+      }, 800);
+    }
+  }
+  setTimeout(typeChar, 400);
+}
+
+// ── NAS Demo 2: In-place AI ─────────────────────────────
+function runNasAiDemo() {
+  const ctxMenu = document.getElementById('nas-ctx-menu');
+  const ctxAi = document.getElementById('nas-ctx-ai');
+  const aiPanel = document.getElementById('nas-ai-panel');
+  const userMsg = document.getElementById('nas-ai-user-msg');
+  const aiTyping = document.getElementById('nas-ai-typing');
+  const botMsg = document.getElementById('nas-ai-bot-msg');
+
+  if (!ctxMenu) return;
+
+  // Step 1: Show context menu (delayed)
+  setTimeout(() => {
+    ctxMenu.style.display = 'block';
+  }, 800);
+
+  // Step 2: Highlight "Ask AI" option
+  setTimeout(() => {
+    if (ctxAi) ctxAi.classList.add('highlight');
+  }, 2000);
+
+  // Step 3: Hide context menu, show AI panel
+  setTimeout(() => {
+    ctxMenu.style.display = 'none';
+    if (aiPanel) aiPanel.style.display = 'flex';
+  }, 2800);
+
+  // Step 4: Show user message
+  setTimeout(() => {
+    if (userMsg) userMsg.style.display = 'block';
+  }, 3400);
+
+  // Step 5: Show typing dots
+  setTimeout(() => {
+    if (aiTyping) aiTyping.style.display = 'flex';
+  }, 3900);
+
+  // Step 6: Hide typing, show bot response
+  setTimeout(() => {
+    if (aiTyping) aiTyping.style.display = 'none';
+    if (botMsg) botMsg.style.display = 'block';
+  }, 5200);
+}
 
 // ── Scroll reveal (IntersectionObserver) ─────────────────
 const revealObserver = new IntersectionObserver(entries => {

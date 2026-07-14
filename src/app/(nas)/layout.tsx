@@ -5,12 +5,13 @@
 // Shares auth with AI app via the same auth-store
 // ============================================================================
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { nasApiClient } from "@/lib/nas-api-client";
 import { NasSidebar } from "@/components/nas/nas-sidebar";
-import { Loader2, WifiOff, RefreshCw, PanelLeftClose } from "lucide-react";
+import { Loader2, WifiOff, RefreshCw, PanelLeftClose, Menu, LogOut, Settings, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 function NasLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -172,6 +173,19 @@ function NasLayoutInner({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Page Content */}
+        <div className="flex items-center justify-between px-4 h-12 border-b border-border-subtle shrink-0">
+          {/* Mobile menu toggle */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden p-2 -ml-2 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-white/5 transition-colors"
+            aria-label="Open sidebar"
+          >
+            <Menu size={22} />
+          </button>
+          <div className="flex-1" />
+          {/* Account avatar (top-right) */}
+          <NasHeaderAccountMenu />
+        </div>
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
 
@@ -201,5 +215,100 @@ export default function NasLayout({
     >
       <NasLayoutInner>{children}</NasLayoutInner>
     </Suspense>
+  );
+}
+
+// ── NAS Header Account Menu (top-right avatar → dropdown) ────────────────
+function NasHeaderAccountMenu() {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { user, activeAccount, logout } = useAuthStore();
+
+  const initial = (user?.username || "U")[0].toUpperCase();
+  const serverUrl = activeAccount?.serverUrl || "";
+  const displayServer = serverUrl.replace(/^https?:\/\//, "");
+
+  // Close on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [isOpen]);
+
+  const handleSignOut = async () => {
+    setIsOpen(false);
+    await logout();
+    router.replace("/login");
+  };
+
+  return (
+    <div className="relative" ref={menuRef}>
+      {/* Avatar Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00BCD4] to-[#7C4DFF] flex items-center justify-center hover:ring-2 hover:ring-[#7C4DFF]/40 transition-all cursor-pointer"
+        aria-label="Account menu"
+      >
+        <span className="text-white text-xs font-semibold">{initial}</span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-bg-elevated border border-border-default shadow-2xl overflow-hidden z-50">
+          {/* User Info */}
+          <div className="px-4 py-4 border-b border-border-subtle">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00BCD4] to-[#7C4DFF] flex items-center justify-center shrink-0">
+                <span className="text-white font-bold text-sm">{initial}</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-text-primary text-sm font-semibold truncate">
+                  {user?.username || "User"}
+                </p>
+                {user?.email && (
+                  <p className="text-text-tertiary text-[11px] truncate">{user.email}</p>
+                )}
+              </div>
+            </div>
+            {displayServer && (
+              <div className="mt-2.5 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
+                <span className="text-text-tertiary text-[10px] truncate font-mono">
+                  {displayServer}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Menu Items */}
+          <div className="py-1">
+            <Link
+              href="/nas/settings"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-text-secondary hover:bg-white/[0.04] transition-colors text-sm"
+            >
+              <Settings size={15} />
+              NAS Settings
+              <ChevronRight size={13} className="ml-auto text-text-tertiary" />
+            </Link>
+          </div>
+
+          {/* Sign Out */}
+          <div className="border-t border-border-subtle py-1">
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-red-400/70 hover:bg-red-500/5 transition-colors text-sm"
+            >
+              <LogOut size={15} />
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

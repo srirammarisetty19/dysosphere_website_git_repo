@@ -60,8 +60,8 @@
             <div class="animate-in d4">
                 <!-- Demo Tabs -->
                 <div class="demo-tabs">
-                    <button class="demo-tab active" data-tab="ai">🤖 AI Assistant</button>
-                    <button class="demo-tab" data-tab="nas">💾 NAS Storage</button>
+                    <button class="demo-tab active" data-tab="ai">🤖 AI Assistant<div class="demo-tab-progress"></div></button>
+                    <button class="demo-tab" data-tab="nas">💾 NAS Storage<div class="demo-tab-progress"></div></button>
                 </div>
 
                 <!-- AI Assistant Panel -->
@@ -101,31 +101,126 @@
                 <!-- NAS Storage Panel -->
                 <div class="demo-tab-panel" id="panel-nas">
                     <div class="dual-chat-demos">
-                        <!-- NAS File Search Demo -->
+                        <!-- NAS Demo 1: AI Photo Search -->
                         <div>
-                            <span class="chat-label">File Search</span>
-                            <div class="chat-window">
-                                <div class="chat-header"><div class="chat-avatar">⬡</div><div><strong>SphereX</strong><span class="chat-status">● Local</span></div></div>
-                                <div class="chat-messages">
-                                    <div class="msg msg-user">Show me all project files modified this week larger than 50MB</div>
-                                    <div class="msg msg-ai">
-                                        <div class="msg-typing" id="typing3"><span></span><span></span><span></span></div>
-                                        <div class="msg-content" id="reply3" style="display:none">Found 5 files matching your criteria 📁<br><br>📄 <strong>ProductDemo-Final.mp4</strong> — 248 MB<br>&nbsp;&nbsp;📂 /Projects/SphereX/Marketing/<br>&nbsp;&nbsp;🕐 Modified: Jul 3, 2026<br><br>📄 <strong>Q3-Dataset-Export.csv</strong> — 127 MB<br>&nbsp;&nbsp;📂 /Analytics/Exports/<br>&nbsp;&nbsp;🕐 Modified: Jul 2, 2026<br><br>📄 <strong>DesignAssets-v4.psd</strong> — 89 MB<br>&nbsp;&nbsp;📂 /Design/Brand/<br>&nbsp;&nbsp;🕐 Modified: Jul 4, 2026<br><br>+ 2 more files. Total: 612 MB across 3 volumes.</div>
+                            <span class="chat-label">AI Photo Search</span>
+                            <div class="nas-mockup" id="nas-demo-search">
+                                <!-- Slim Sidebar -->
+                                <div class="nas-mock-sidebar">
+                                    <div class="nas-mock-sidebar-logo"><span class="nas-mock-ds">DS</span> <span>SphereX NAS</span></div>
+                                    <div class="nas-mock-nav-item active"><span class="nas-mock-nav-icon">🏠</span> Home</div>
+                                    <div class="nas-mock-nav-item"><span class="nas-mock-nav-icon">⭐</span> Starred</div>
+                                    <div class="nas-mock-nav-item"><span class="nas-mock-nav-icon">👥</span> People</div>
+                                    <div class="nas-mock-nav-item"><span class="nas-mock-nav-icon">🔗</span> Shared</div>
+                                    <div class="nas-mock-nav-sep"></div>
+                                    <div class="nas-mock-nav-item highlight"><span class="nas-mock-nav-icon">🔍</span> Search</div>
+                                    <div class="nas-mock-nav-item"><span class="nas-mock-nav-icon">🗑️</span> Trash</div>
+                                    <div class="nas-mock-sidebar-bottom">
+                                        <div class="nas-mock-nav-icon">💾</div>
+                                        <div class="nas-mock-storage-bar"><div class="nas-mock-storage-fill"></div></div>
+                                        <span class="nas-mock-storage-text">18.8 MB of 456 GB</span>
+                                    </div>
+                                </div>
+                                <!-- Content Area -->
+                                <div class="nas-mock-content">
+                                    <!-- Search Bar -->
+                                    <div class="nas-mock-searchbar">
+                                        <span class="nas-mock-search-icon">🔍</span>
+                                        <span class="nas-mock-search-text" id="nas-search-typing"></span>
+                                        <span class="nas-mock-search-cursor" id="nas-search-cursor">|</span>
+                                        <span class="nas-mock-sparkle" id="nas-search-sparkle">✨</span>
+                                    </div>
+                                    <!-- Results -->
+                                    <div class="nas-mock-results" id="nas-search-results" style="display:none">
+                                        <div class="nas-mock-results-label" id="nas-results-label" style="display:none">
+                                            <span class="nas-mock-sparkle-sm">✨</span> Found 47 photos matching "beach in Goa"
+                                        </div>
+                                        <div class="nas-mock-photo-grid">
+                                            <div class="nas-mock-photo" id="nas-photo-1" style="opacity:0"><img src="images/nas-photo-1.png" alt="Beach group photo"></div>
+                                            <div class="nas-mock-photo" id="nas-photo-2" style="opacity:0"><img src="images/nas-photo-2.png" alt="Sunset beach"></div>
+                                            <div class="nas-mock-photo" id="nas-photo-3" style="opacity:0"><img src="images/nas-photo-3.png" alt="Friends on sand"></div>
+                                            <div class="nas-mock-photo" id="nas-photo-4" style="opacity:0"><img src="images/nas-photo-4.png" alt="Beach scenic"></div>
+                                        </div>
+                                        <div class="nas-mock-meta" id="nas-meta" style="display:none">
+                                            📂 /Photos/2025/Goa Trip/ &nbsp;·&nbsp; 👥 You, Priya, Rahul, Mom
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <!-- NAS AI Photo Search Demo -->
+                        <!-- NAS Demo 2: In-place AI -->
                         <div>
-                            <span class="chat-label">AI Photo Search</span>
-                            <div class="chat-window">
-                                <div class="chat-header"><div class="chat-avatar">⬡</div><div><strong>SphereX</strong><span class="chat-status">● Local</span></div></div>
-                                <div class="chat-messages">
-                                    <div class="msg msg-user">Find the vacation photos from Goa where everyone is on the beach</div>
-                                    <div class="msg msg-ai">
-                                        <div class="msg-typing" id="typing4"><span></span><span></span><span></span></div>
-                                        <div class="msg-content" id="reply4" style="display:none">Found 47 photos matching "beach in Goa" 📸<br><br><div class="nas-photo-grid"><img src="images/nas-photo-1.png" alt="Beach group photo"><img src="images/nas-photo-2.png" alt="Sunset beach"><img src="images/nas-photo-3.png" alt="Friends on sand"><img src="images/nas-photo-4.png" alt="Beach scenic"></div>📂 <strong>/Photos/2025/Goa Trip/</strong><br>👥 People detected: You, Priya, Rahul, Mom<br>🏖️ 23 beach photos, 12 sunset shots, 12 group photos<br><br>Want me to create a shared album with just the group photos?</div>
+                            <span class="chat-label">In-Place AI</span>
+                            <div class="nas-mockup" id="nas-demo-ai">
+                                <!-- Slim Sidebar (simplified) -->
+                                <div class="nas-mock-sidebar">
+                                    <div class="nas-mock-sidebar-logo"><span class="nas-mock-ds">DS</span> <span>SphereX NAS</span></div>
+                                    <div class="nas-mock-nav-item active"><span class="nas-mock-nav-icon">🏠</span> Home</div>
+                                    <div class="nas-mock-nav-item"><span class="nas-mock-nav-icon">⭐</span> Starred</div>
+                                    <div class="nas-mock-nav-item"><span class="nas-mock-nav-icon">👥</span> People</div>
+                                    <div class="nas-mock-nav-item"><span class="nas-mock-nav-icon">🔗</span> Shared</div>
+                                    <div class="nas-mock-nav-sep"></div>
+                                    <div class="nas-mock-nav-item"><span class="nas-mock-nav-icon">🔍</span> Search</div>
+                                    <div class="nas-mock-nav-item"><span class="nas-mock-nav-icon">🗑️</span> Trash</div>
+                                    <div class="nas-mock-nav-item"><span class="nas-mock-nav-icon">⚙️</span> Settings</div>
+                                </div>
+                                <!-- Content Area -->
+                                <div class="nas-mock-content nas-mock-content-relative">
+                                    <!-- Breadcrumb bar -->
+                                    <div class="nas-mock-toolbar">
+                                        <span>🏠 My NAS <span class="nas-mock-breadcrumb-sep">›</span> Projects</span>
+                                        <span class="nas-mock-toolbar-right">⫶ Filter &nbsp; ↕ Name</span>
                                     </div>
+                                    <!-- File grid -->
+                                    <div class="nas-mock-files">
+                                        <div class="nas-mock-file-card">
+                                            <div class="nas-mock-file-thumb folder">📁</div>
+                                            <span class="nas-mock-file-name">Design Assets</span>
+                                        </div>
+                                        <div class="nas-mock-file-card">
+                                            <div class="nas-mock-file-thumb folder">📁</div>
+                                            <span class="nas-mock-file-name">Marketing</span>
+                                        </div>
+                                        <div class="nas-mock-file-card nas-mock-file-target" id="nas-ai-target">
+                                            <div class="nas-mock-file-thumb doc">📄</div>
+                                            <span class="nas-mock-file-name">Q3-Report.pdf</span>
+                                        </div>
+                                        <div class="nas-mock-file-card">
+                                            <div class="nas-mock-file-thumb img">🖼️</div>
+                                            <span class="nas-mock-file-name">logo-final.png</span>
+                                        </div>
+                                    </div>
+                                    <!-- Context Menu (hidden initially) -->
+                                    <div class="nas-mock-ctx" id="nas-ctx-menu" style="display:none">
+                                        <div class="nas-mock-ctx-item">📂 Open</div>
+                                        <div class="nas-mock-ctx-item">⬇️ Download</div>
+                                        <div class="nas-mock-ctx-item nas-mock-ctx-ai" id="nas-ctx-ai">✨ Ask AI</div>
+                                        <div class="nas-mock-ctx-item">⭐ Add to Starred</div>
+                                        <div class="nas-mock-ctx-item">🔗 Share</div>
+                                        <div class="nas-mock-ctx-sep"></div>
+                                        <div class="nas-mock-ctx-item danger">🗑️ Move to trash</div>
+                                    </div>
+                                </div>
+                                <!-- AI Panel (hidden initially, slides in) -->
+                                <div class="nas-mock-ai-panel" id="nas-ai-panel" style="display:none">
+                                    <div class="nas-mock-ai-header">
+                                        <span>📄 Q3-Report.pdf</span>
+                                        <span class="nas-mock-ai-badge">✨ Ask AI</span>
+                                        <span class="nas-mock-ai-close">✕</span>
+                                    </div>
+                                    <div class="nas-mock-ai-messages">
+                                        <div class="nas-mock-ai-msg user" id="nas-ai-user-msg" style="display:none">Summarize the key findings</div>
+                                        <div class="nas-mock-ai-typing" id="nas-ai-typing" style="display:none"><span></span><span></span><span></span></div>
+                                        <div class="nas-mock-ai-msg bot" id="nas-ai-bot-msg" style="display:none">
+                                            <strong>Key findings from Q3-Report.pdf:</strong><br><br>
+                                            📊 Revenue grew 23% YoY to $4.2M<br>
+                                            📈 Active users up 18% (12K → 14.2K)<br>
+                                            💰 Operating costs reduced by 11%<br>
+                                            ⚠️ Churn rate slightly up (2.1% → 2.4%)<br><br>
+                                            <em>Source: Q3-Report.pdf, Pages 3-7</em>
+                                        </div>
+                                    </div>
+                                    <div class="nas-mock-ai-input">Ask about this file...</div>
                                 </div>
                             </div>
                         </div>
