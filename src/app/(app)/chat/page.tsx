@@ -37,20 +37,69 @@ export default function ChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
+  const graceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hadActiveGenRef = useRef(false);
 
   // Load conversations on mount
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
 
-  // GPU heartbeat (30s interval, matching Flutter)
+  // ── GPU heartbeat — activity-based (Google Colab / AWS SageMaker pattern) ──
+  // Only claim GPU when LLM is actively streaming tokens. Prevents NAS
+  // upload AI processing from being starved by an idle chat tab.
   useEffect(() => {
-    const sendHeartbeat = () => apiClient.sendGpuHeartbeat("active");
-    sendHeartbeat();
-    heartbeatRef.current = setInterval(sendHeartbeat, 30000);
+    // Clear grace timer on any loading state change
+    if (graceTimerRef.current) {
+      clearTimeout(graceTimerRef.current);
+      graceTimerRef.current = null;
+    }
+
+    if (isLoading) {
+      // LLM is streaming — claim GPU immediately, refresh every 30s
+      hadActiveGenRef.current = true;
+      apiClient.sendGpuHeartbeat("active");
+      heartbeatRef.current = setInterval(
+        () => apiClient.sendGpuHeartbeat("active"),
+        30_000
+      );
+    } else {
+      // Not streaming — stop heartbeat interval
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+      // Grace period: keep GPU for 60s after generation ends
+      // (user might ask a follow-up — avoids 16s cold restart)
+      if (hadActiveGenRef.current) {
+        hadActiveGenRef.current = false;
+        graceTimerRef.current = setTimeout(() => {
+          apiClient.sendGpuHeartbeat("closed");
+        }, 60_000);
+      }
+    }
 
     return () => {
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+    };
+  }, [isLoading]);
+
+  // Visibility change + unmount cleanup
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        apiClient.sendGpuHeartbeat("background");
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      if (graceTimerRef.current) clearTimeout(graceTimerRef.current);
       apiClient.sendGpuHeartbeat("closed");
     };
   }, []);
