@@ -172,6 +172,11 @@ class NasApiClient {
       throw new NasApiClientError(message, response.status);
     }
 
+    // Debug logging for search-related requests
+    if (path.includes('/search')) {
+      console.log('[NAS API] Request OK:', path, '→', response.status);
+    }
+
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       return response.json();
@@ -345,6 +350,8 @@ class NasApiClient {
   async searchSemantic(
     query: string
   ): Promise<{ media?: FileItem[]; documents?: FileItem[] }> {
+    const url = this.resolveUrl(`/api/nas-files/search/semantic?q=${encodeURIComponent(query)}`);
+    console.log('[NAS API] searchSemantic → URL:', url);
     return this.request(
       `/api/nas-files/search/semantic?q=${encodeURIComponent(query)}`
     );

@@ -1327,6 +1327,10 @@
     max-width: var(--container-4xl);
   }
 
+  .max-w-16 {
+    max-width: calc(var(--spacing) * 16);
+  }
+
   .max-w-\[75\%\] {
     max-width: 75%;
   }
@@ -3622,6 +3626,26 @@
     }
   }
 
+  .text-amber-400\/70 {
+    color: #fcbb00b3;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .text-amber-400\/70 {
+      color: color-mix(in oklab, var(--color-amber-400) 70%, transparent);
+    }
+  }
+
+  .text-amber-400\/80 {
+    color: #fcbb00cc;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .text-amber-400\/80 {
+      color: color-mix(in oklab, var(--color-amber-400) 80%, transparent);
+    }
+  }
+
   .text-amber-500 {
     color: var(--color-amber-500);
   }
@@ -3716,6 +3740,16 @@
 
   .text-purple-400 {
     color: var(--color-purple-400);
+  }
+
+  .text-purple-400\/60 {
+    color: #c07eff99;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .text-purple-400\/60 {
+      color: color-mix(in oklab, var(--color-purple-400) 60%, transparent);
+    }
   }
 
   .text-purple-400\/80 {
@@ -4268,6 +4302,18 @@
   @media (hover: hover) {
     .group-hover\:border-accent-blue:is(:where(.group):hover *) {
       border-color: #3476fc;
+    }
+  }
+
+  @media (hover: hover) {
+    .group-hover\:border-purple-400\/50:is(:where(.group):hover *) {
+      border-color: #c07eff80;
+    }
+
+    @supports (color: color-mix(in lab, red, red)) {
+      .group-hover\:border-purple-400\/50:is(:where(.group):hover *) {
+        border-color: color-mix(in oklab, var(--color-purple-400) 50%, transparent);
+      }
     }
   }
 

@@ -7,7 +7,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNasFilesStore } from "@/stores/nas-files-store";
 import { nasApiClient } from "@/lib/nas-api-client";
-import type { DisplayItem, FileTypeFilter } from "@/lib/nas-types";
+import type { DisplayItem, FileItem, FileTypeFilter } from "@/lib/nas-types";
 import { matchesFilter } from "@/lib/nas-types";
 import { BreadcrumbNav } from "@/components/nas/breadcrumb-nav";
 import { FileGridView } from "@/components/nas/file-grid-view";
@@ -114,6 +114,9 @@ export default function NasHomePage() {
   const [searchResults, setSearchResults] = useState<DisplayItem[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [inlineAiResults, setInlineAiResults] = useState<FileItem[]>([]);
+  const [isInlineAiSearching, setIsInlineAiSearching] = useState(false);
+  const [inlineAiError, setInlineAiError] = useState<string | null>(null);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -129,11 +132,17 @@ export default function NasHomePage() {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
       if (!value.trim()) {
         setSearchResults([]);
+        setInlineAiResults([]);
+        setInlineAiError(null);
         setIsSearching(false);
+        setIsInlineAiSearching(false);
         return;
       }
       setIsSearching(true);
+      setIsInlineAiSearching(true);
+      setInlineAiError(null);
       searchDebounceRef.current = setTimeout(async () => {
+        // ── Text search (filename match) ──────────────────────────────
         try {
           const data = await nasApiClient.searchFiles(value.trim());
           const items: DisplayItem[] = data.map((raw: any) => {
@@ -143,10 +152,30 @@ export default function NasHomePage() {
               : { kind: "file" as const, item: raw };
           });
           setSearchResults(items);
-        } catch {
+        } catch (err) {
+          console.error('[NAS Search] Text search failed:', err);
           setSearchResults([]);
         } finally {
           setIsSearching(false);
+        }
+
+        // ── AI Semantic search (parallel) ──────────────────────────────
+        try {
+          console.log('[NAS Search] Calling semantic search for:', value.trim());
+          const semantic = await nasApiClient.searchSemantic(value.trim());
+          const allFiles = [
+            ...(semantic.media || []),
+            ...(semantic.documents || []),
+          ] as FileItem[];
+          console.log('[NAS Search] Semantic search returned', allFiles.length, 'results');
+          setInlineAiResults(allFiles);
+          setInlineAiError(null);
+        } catch (err) {
+          console.error('[NAS Search] Semantic search failed:', err);
+          setInlineAiResults([]);
+          setInlineAiError('AI search unavailable');
+        } finally {
+          setIsInlineAiSearching(false);
         }
       }, 350);
     },
@@ -156,8 +185,11 @@ export default function NasHomePage() {
   const clearSearch = useCallback(() => {
     setSearchQuery("");
     setSearchResults([]);
+    setInlineAiResults([]);
+    setInlineAiError(null);
     setIsSearchFocused(false);
     setIsSearching(false);
+    setIsInlineAiSearching(false);
   }, []);
 
   // ── Build display items ─────────────────────────────────────────────
@@ -402,19 +434,75 @@ export default function NasHomePage() {
                 onClick={clearSearch}
               />
               <div className="absolute left-4 right-4 top-full mt-1 z-40 max-h-[60vh] overflow-y-auto rounded-xl border border-border-subtle bg-bg-secondary shadow-2xl animate-search-results">
+                {/* ── AI Semantic Results ─────────────────────────────── */}
+                {(isInlineAiSearching || inlineAiResults.length > 0) && (
+                  <div className="border-b border-border-subtle">
+                    <div className="flex items-center gap-2 px-4 py-2">
+                      <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                      <span className="text-[11px] font-medium text-purple-400 uppercase tracking-wider">
+                        {isInlineAiSearching ? "AI Searching…" : `${inlineAiResults.length} AI Match${inlineAiResults.length !== 1 ? "es" : ""}`}
+                      </span>
+                      {isInlineAiSearching && (
+                        <Loader2 className="h-3 w-3 animate-spin text-purple-400" />
+                      )}
+                    </div>
+                    {isInlineAiSearching ? (
+                      <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="w-16 shrink-0 aspect-square rounded-lg bg-white/5 animate-pulse" />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none">
+                        {inlineAiResults.slice(0, 6).map((file) => (
+                          <button
+                            key={file.id}
+                            onClick={() => {
+                              setViewerItem({ kind: "file", item: file });
+                              clearSearch();
+                            }}
+                            className="shrink-0 group"
+                          >
+                            <div className="w-16 aspect-square rounded-lg overflow-hidden border border-border-subtle group-hover:border-purple-400/50 transition-colors bg-white/5 flex items-center justify-center">
+                              {(file.mime_type || "").startsWith("image/") || (file.mime_type || "").startsWith("video/") ? (
+                                <img
+                                  src={nasApiClient.thumbnailUrl(file.id)}
+                                  alt={file.name}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                />
+                              ) : (
+                                <Search className="h-4 w-4 text-purple-400/60" />
+                              )}
+                            </div>
+                            <p className="text-[9px] text-text-tertiary text-center truncate mt-1 max-w-16">{file.name}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {inlineAiError && !isInlineAiSearching && inlineAiResults.length === 0 && (
+                  <div className="px-4 py-2 text-[11px] text-amber-400/70 border-b border-border-subtle">
+                    <Sparkles className="h-3 w-3 inline mr-1" />
+                    {inlineAiError}
+                  </div>
+                )}
+
+                {/* ── Text Search Results ─────────────────────────────── */}
                 {isSearching ? (
                   <div className="flex items-center gap-3 px-5 py-4">
                     <Loader2 className="h-4 w-4 animate-spin text-accent-blue" />
                     <span className="text-sm text-text-secondary">Searching...</span>
                   </div>
-                ) : searchResults.length === 0 ? (
+                ) : searchResults.length === 0 && inlineAiResults.length === 0 && !isInlineAiSearching ? (
                   <div className="px-5 py-4 text-sm text-text-tertiary">
                     No results for &ldquo;{searchQuery}&rdquo;
                   </div>
-                ) : (
+                ) : searchResults.length > 0 ? (
                   <>
                     <div className="px-4 py-2 text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
-                      {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}
+                      {searchResults.length} filename match{searchResults.length !== 1 ? "es" : ""}
                     </div>
                     {searchResults.slice(0, 8).map((item) => (
                       <button
@@ -444,17 +532,18 @@ export default function NasHomePage() {
                         </div>
                       </button>
                     ))}
-                    {searchResults.length > 8 && (
-                      <Link
-                        href={`/nas/search?q=${encodeURIComponent(searchQuery)}`}
-                        onClick={clearSearch}
-                        className="flex items-center gap-2 px-4 py-3 text-sm text-accent-blue hover:bg-white/[0.04] border-t border-border-subtle"
-                      >
-                        <Search className="h-4 w-4" />
-                        See all {searchResults.length} results
-                      </Link>
-                    )}
                   </>
+                ) : null}
+                {/* ── "See all" link ─────────────────────────────────── */}
+                {(searchResults.length > 8 || inlineAiResults.length > 0) && (
+                  <Link
+                    href={`/nas/search?q=${encodeURIComponent(searchQuery)}`}
+                    onClick={clearSearch}
+                    className="flex items-center gap-2 px-4 py-3 text-sm text-accent-blue hover:bg-white/[0.04] border-t border-border-subtle"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    See all results with AI search
+                  </Link>
                 )}
               </div>
             </>

@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { nasApiClient } from "@/lib/nas-api-client";
 import type { FileItem, DisplayItem } from "@/lib/nas-types";
 import { FileThumbnail } from "@/components/nas/file-thumbnail";
@@ -27,13 +28,27 @@ export default function SearchPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [viewerItem, setViewerItem] = useState<DisplayItem | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
+  const initialSearchDone = useRef(false);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Auto-search if ?q= param is present (from inline search "See all results" link)
+  useEffect(() => {
+    if (initialSearchDone.current) return;
+    const urlQuery = searchParams.get("q");
+    if (urlQuery && urlQuery.trim()) {
+      initialSearchDone.current = true;
+      setQuery(urlQuery);
+      doSearch(urlQuery);
+    }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) {
@@ -65,12 +80,15 @@ export default function SearchPage() {
 
     // AI semantic search (parallel)
     setIsAiSearching(true);
+    setAiError(null);
     try {
+      console.log('[NAS Search Page] Calling semantic search for:', q.trim());
       const semantic = await nasApiClient.searchSemantic(q.trim());
       const allFiles = [
         ...(semantic.media || []),
         ...(semantic.documents || []),
       ];
+      console.log('[NAS Search Page] Semantic search returned', allFiles.length, 'results');
       const visual = allFiles.filter((f) => {
         const m = f.mime_type || "";
         return m.startsWith("image/") || m.startsWith("video/");
@@ -81,9 +99,11 @@ export default function SearchPage() {
       });
       setVisualMatches(visual);
       setDocMatches(docs);
-    } catch {
+    } catch (err) {
+      console.error('[NAS Search Page] Semantic search failed:', err);
       setVisualMatches([]);
       setDocMatches([]);
+      setAiError('AI search failed — the search engine may be unavailable');
     } finally {
       setIsAiSearching(false);
     }
@@ -127,6 +147,13 @@ export default function SearchPage() {
           </div>
         ) : (
           <div className="space-y-0">
+            {/* AI Error Banner */}
+            {aiError && !isAiSearching && (
+              <div className="flex items-center gap-2 px-6 py-2.5 text-amber-400/80 bg-amber-500/5 border-b border-border-subtle">
+                <Sparkles className="h-4 w-4" />
+                <span className="text-xs">{aiError}</span>
+              </div>
+            )}
             {/* AI Visual Matches */}
             {(isAiSearching || visualMatches.length > 0) && (
               <div className="border-b border-border-subtle pb-4">
