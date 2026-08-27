@@ -598,10 +598,19 @@ class NasApiClient {
   // ── People / Face Clusters ──────────────────────────────────────────
 
   async getClusters(): Promise<PersonCluster[]> {
-    const data = await this.request<{ clusters: PersonCluster[] }>(
-      "/api/nas-people/clusters"
-    );
+    const data = await this.request<{
+      clusters: PersonCluster[];
+      unclustered_count?: number;
+    }>("/api/nas-people/clusters");
     return data.clusters || [];
+  }
+
+  /** Returns full clusters response including unclustered_count */
+  async getClustersWithMeta(): Promise<{
+    clusters: PersonCluster[];
+    unclustered_count: number;
+  }> {
+    return this.request("/api/nas-people/clusters");
   }
 
   async getClusterPhotos(
@@ -650,6 +659,74 @@ class NasApiClient {
   async unhideCluster(clusterId: string): Promise<void> {
     await this.request(`/api/nas-people/clusters/${clusterId}/unhide`, {
       method: "POST",
+    });
+  }
+
+  // ── Unclustered Faces ("Others" Section) ────────────────────────────
+
+  async getUnclusteredFaces(
+    limit = 30,
+    offset = 0
+  ): Promise<{ faces: Record<string, unknown>[]; total: number }> {
+    return this.request(
+      `/api/nas-people/clusters/unclustered?limit=${limit}&offset=${offset}`
+    );
+  }
+
+  async assignFaceToCluster(
+    fileId: string,
+    clusterId: string
+  ): Promise<Record<string, unknown>> {
+    return this.request("/api/nas-people/clusters/assign", {
+      method: "POST",
+      body: JSON.stringify({ file_id: fileId, cluster_id: clusterId }),
+    });
+  }
+
+  // ── Cluster Split ──────────────────────────────────────────────────
+
+  async splitCluster(
+    clusterId: string,
+    fileIds: string[]
+  ): Promise<Record<string, unknown>> {
+    return this.request(`/api/nas-people/clusters/${clusterId}/split`, {
+      method: "POST",
+      body: JSON.stringify({ file_ids: fileIds }),
+    });
+  }
+
+  // ── Merge Suggestions ──────────────────────────────────────────────
+
+  async getMergeSuggestions(): Promise<{
+    suggestions: Array<{
+      cluster_a: string;
+      cluster_b: string;
+      similarity: number;
+      cluster_a_label: string;
+      cluster_b_label: string;
+    }>;
+    total: number;
+  }> {
+    return this.request("/api/nas-people/suggestions");
+  }
+
+  async acceptSuggestion(
+    clusterA: string,
+    clusterB: string
+  ): Promise<Record<string, unknown>> {
+    return this.request("/api/nas-people/suggestions/accept", {
+      method: "POST",
+      body: JSON.stringify({ cluster_a: clusterA, cluster_b: clusterB }),
+    });
+  }
+
+  async rejectSuggestion(
+    clusterA: string,
+    clusterB: string
+  ): Promise<Record<string, unknown>> {
+    return this.request("/api/nas-people/suggestions/reject", {
+      method: "POST",
+      body: JSON.stringify({ cluster_a: clusterA, cluster_b: clusterB }),
     });
   }
 
