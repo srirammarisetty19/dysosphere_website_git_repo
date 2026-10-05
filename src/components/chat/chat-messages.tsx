@@ -525,27 +525,19 @@ function AssistantBubble({
   currentActivity: string | null;
   iterationSummaries: string[];
 }) {
-  const { content, steps, thinking_duration_sec, image_urls, nas_files } = message;
+  const { content, thinking_content, steps, thinking_duration_sec, image_urls, nas_files } = message;
 
-  // Parse <think> blocks
-  const thinkRegex = /<think>([\s\S]*?)(?:<\/think>|$)/i;
-  const thinkMatch = content.match(thinkRegex);
-  const thinkDone = /<\/think>/i.test(content);
-
-  let thinkContent: string | null = null;
-  let finalResponse = content;
-
-  if (thinkMatch) {
-    thinkContent = thinkMatch[1]?.trim() || null;
-    const before = content.substring(0, thinkMatch.index || 0);
-    const after = thinkDone ? content.substring((thinkMatch.index || 0) + thinkMatch[0].length) : "";
-    finalResponse = (before + after).trim();
-  }
+  // Use structured thinking_content field (no more regex parsing)
+  const thinkContent = thinking_content || null;
 
   // Safety: strip any residual <think>/<tool_call> tags that might leak through
-  finalResponse = finalResponse.replace(/<\/?think>/gi, "").replace(/<tool_call>[\s\S]*?(<\/tool_call>|$)/gi, "").trim();
+  let finalResponse = content
+    .replace(/<\/?think>/gi, "")
+    .replace(/<think>[\s\S]*?(<\/think>|$)/gi, "")
+    .replace(/<tool_call>[\s\S]*?(<\/tool_call>|$)/gi, "")
+    .trim();
 
-  // Also clean "## FINAL ANSWER:" prefixes from the server's formatting
+  // Clean "## FINAL ANSWER:" prefixes from the server's formatting
   finalResponse = finalResponse.replace(/^##\s*FINAL\s*ANSWER:?\s*/i, "").trim();
 
   const hasThinkingOrSteps =

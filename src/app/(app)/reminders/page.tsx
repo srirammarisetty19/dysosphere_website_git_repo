@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Zap,
   Plus,
@@ -17,9 +18,17 @@ import {
   Repeat,
   AlertCircle,
   Menu,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
+  History,
+  RefreshCw,
 } from "lucide-react";
 import { useHeartbeatsStore, describeCron } from "@/stores/heartbeats-store";
-import type { Heartbeat } from "@/lib/types";
+import { useChatStore } from "@/stores/chat-store";
+import { apiClient } from "@/lib/api-client";
+import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
+import type { Heartbeat, HeartbeatResult } from "@/lib/types";
 
 export default function RemindersPage() {
   const { heartbeats, isLoading, error, load, create, toggle, remove } = useHeartbeatsStore();
@@ -326,6 +335,172 @@ function HeartbeatTile({
               </div>
             )}
           </div>
+          <RecentRuns heartbeatId={heartbeat.id} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Recent Runs (GET /heartbeats/{id}/results) ───────────────────────────────
+const RUNS_PAGE = 5;
+
+function formatDuration(ms: number | null): string | null {
+  if (ms == null) return null;
+  if (ms < 1000) return `${ms} ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)} s`;
+  return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+}
+
+function formatWhen(iso: string | null): string {
+  if (!iso) return "Unknown time";
+  // Server stores naive UTC timestamps — treat a missing offset as UTC.
+  const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`);
+  const diff = Date.now() - d.getTime();
+  const min = Math.round(diff / 60000);
+  if (min < 1) return "Just now";
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr} h ago`;
+  return d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function RecentRuns({ heartbeatId }: { heartbeatId: string }) {
+  const router = useRouter();
+  const loadConversation = useChatStore((s) => s.loadConversation);
+  const [runs, setRuns] = useState<HeartbeatResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [limit, setLimit] = useState(RUNS_PAGE);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .getHeartbeatResults(heartbeatId, limit)
+      .then((data) => {
+        if (cancelled) return;
+        setRuns(data.results ?? []);
+        setError(null);
+      })
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : "Couldn't load runs"))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [heartbeatId, limit, reloadKey]);
+
+  const refresh = () => {
+    setLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
+
+  const showMore = () => {
+    setLoading(true);
+    setLimit((l) => Math.min(l + 10, 100));
+  };
+
+  const openSession = (sessionId: string) => {
+    loadConversation(sessionId);
+    router.push("/chat");
+  };
+
+  return (
+    <div className="mt-4 pt-3 border-t border-white/[0.04]">
+      <div className="flex items-center justify-between mb-2">
+        <span className="flex items-center gap-1.5 text-white/25 text-[10px] uppercase tracking-wider font-semibold">
+          <History size={11} /> Recent runs
+        </span>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="p-1 rounded text-white/20 hover:text-white/50 transition-colors disabled:opacity-50"
+          aria-label="Refresh runs"
+        >
+          <RefreshCw size={11} className={loading ? "animate-spin" : ""} />
+        </button>
+      </div>
+
+      {error ? (
+        <p className="text-red-400/80 text-xs">{error}</p>
+      ) : loading && runs.length === 0 ? (
+        <div className="space-y-1.5">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-9 rounded-lg bg-white/[0.03] animate-pulse" />
+          ))}
+        </div>
+      ) : runs.length === 0 ? (
+        <p className="text-white/20 text-xs">No runs yet — results appear here after this reminder fires.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {runs.map((run) => {
+            const failed = !!run.error;
+            const open = expandedId === run.id;
+            const duration = formatDuration(run.duration_ms);
+            const body = failed ? run.error : run.result;
+            return (
+              <div
+                key={run.id}
+                className={`rounded-lg border transition-colors ${
+                  failed ? "border-red-500/15 bg-red-500/[0.04]" : "border-white/[0.04] bg-white/[0.02]"
+                }`}
+              >
+                <button
+                  onClick={() => setExpandedId(open ? null : run.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                  aria-expanded={open}
+                >
+                  {failed ? (
+                    <XCircle size={13} className="text-red-400 shrink-0" />
+                  ) : (
+                    <CheckCircle2 size={13} className="text-emerald-400/80 shrink-0" />
+                  )}
+                  <span className="text-white/55 text-xs shrink-0">{formatWhen(run.created_at)}</span>
+                  {duration && <span className="text-white/20 text-[10px] shrink-0">· {duration}</span>}
+                  {!open && body && (
+                    <span className="text-white/25 text-[11px] truncate ml-1">
+                      {body.replace(/[*_`#>~]+/g, "").replace(/\s+/g, " ").trim().slice(0, 120)}
+                    </span>
+                  )}
+                </button>
+                {open && (
+                  <div className="px-3 pb-3 -mt-0.5">
+                    {body ? (
+                      failed ? (
+                        <p className="text-red-300/80 text-xs font-mono whitespace-pre-wrap break-words">{body}</p>
+                      ) : (
+                        <div className="text-xs max-h-64 overflow-y-auto">
+                          <MarkdownRenderer content={body} dimmed />
+                        </div>
+                      )
+                    ) : (
+                      <p className="text-white/20 text-xs">No output recorded.</p>
+                    )}
+                    {run.session_id && (
+                      <button
+                        onClick={() => openSession(run.session_id!)}
+                        className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-[#00BCD4]/80 hover:text-[#00BCD4] transition-colors"
+                      >
+                        <MessageSquare size={11} /> Open conversation
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {runs.length >= limit && limit < 100 && (
+            <button
+              onClick={showMore}
+              disabled={loading}
+              className="w-full py-1.5 text-[11px] text-white/30 hover:text-white/60 transition-colors"
+            >
+              {loading ? "Loading…" : "Show more"}
+            </button>
+          )}
         </div>
       )}
     </div>

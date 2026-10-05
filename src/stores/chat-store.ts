@@ -72,7 +72,7 @@ interface ChatState {
 // during streaming. Prevents <reasoning> content from flickering in the
 // visible response area. Industry pattern: Claude/ChatGPT/Gemini all
 // use structured tag parsing for reasoning/response separation.
-function parseStructuredContent(raw: string): string {
+function parseStructuredContent(raw: string): { content: string; thinking: string } {
   // Valid tags that switch parser state
   const tags = [
     "<reasoning>", "</reasoning>",
@@ -83,7 +83,7 @@ function parseStructuredContent(raw: string): string {
   ];
 
   let visible = "";
-  let reasoning = "";
+  let thinking = "";
   let currentTag = "none";
   let pos = 0;
 
@@ -105,13 +105,13 @@ function parseStructuredContent(raw: string): string {
       if (
         currentTag === "<reasoning>" ||
         currentTag === "<think>" ||
-        currentTag === "<thought>" ||
-        currentTag === "<tool_call>"
+        currentTag === "<thought>"
       ) {
-        reasoning += chunk;
+        thinking += chunk;
+      } else if (currentTag === "<tool_call>") {
+        // Discard tool call content
       } else {
         // Visible text. Prevent partial tags at the end of the stream
-        // (like "<reaso") from flickering before they close.
         let finalChunk = chunk;
         const partialTagMatch = finalChunk.match(/<\/?[a-zA-Z_]*$/);
         if (partialTagMatch) {
@@ -127,10 +127,11 @@ function parseStructuredContent(raw: string): string {
     if (
       currentTag === "<reasoning>" ||
       currentTag === "<think>" ||
-      currentTag === "<thought>" ||
-      currentTag === "<tool_call>"
+      currentTag === "<thought>"
     ) {
-      reasoning += chunk;
+      thinking += chunk;
+    } else if (currentTag === "<tool_call>") {
+      // Discard
     } else if (currentTag === "none" || currentTag === "<response>") {
       visible += chunk;
     }
@@ -150,13 +151,7 @@ function parseStructuredContent(raw: string): string {
   visible = visible.replace(/^## FINAL ANSWER:?\s*/gm, "").trim();
   visible = visible.replace(/^## ASSISTANT:?\s*/gm, "").trim();
 
-  // Reconstruct: put reasoning into <think> tags for ThinkingBlock
-  let result = visible.trim();
-  if (reasoning.trim()) {
-    result = `<think>\n${reasoning.trim()}\n</think>\n${result}`;
-  }
-
-  return result.trim();
+  return { content: visible.trim(), thinking: thinking.trim() };
 }
 
 // Strip incomplete image markdown that arrives during streaming
@@ -236,18 +231,22 @@ export const useChatStore = create<ChatState>()((set, get) => {
           console.log(`[Chat] Tab visible: run completed (${runStatus.status}) — reloading messages`);
           try {
             const data = await apiClient.getConversation(conversationId);
-            const rawMessages: Message[] = data.messages.map((m) => ({
-              ...m,
-              role: normalizeRole(m.role || "assistant"),
-              content: parseStructuredContent(m.content || ""),
-              created_at: m.created_at || new Date().toISOString(),
-              steps: m.steps || [],
-              thinking_duration_sec: m.thinking_duration_sec || 0,
-              image_urls: m.image_urls || [],
-              attachments: m.attachments || [],
-              nas_files: m.nas_files || [],
-              parts: m.parts || [],
-            }));
+            const rawMessages: Message[] = data.messages.map((m) => {
+              const parsed = parseStructuredContent(m.content || "");
+              return {
+                ...m,
+                role: normalizeRole(m.role || "assistant"),
+                content: parsed.content,
+                thinking_content: m.thinking_content || parsed.thinking || "",
+                created_at: m.created_at || new Date().toISOString(),
+                steps: m.steps || [],
+                thinking_duration_sec: m.thinking_duration_sec || 0,
+                image_urls: m.image_urls || [],
+                attachments: m.attachments || [],
+                nas_files: m.nas_files || [],
+                parts: m.parts || [],
+              };
+            });
             set({
               messages: groupBlocksIntoTurns(rawMessages),
               errorMessage: null,
@@ -318,6 +317,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     const userMessage: Message = {
       role: "user",
       content: message,
+      thinking_content: "",
       created_at: new Date().toISOString(),
       steps: [],
       thinking_duration_sec: 0,
@@ -331,6 +331,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     const assistantMessage: Message = {
       role: "assistant",
       content: "",
+      thinking_content: "",
       created_at: new Date().toISOString(),
       steps: [],
       thinking_duration_sec: 0,
@@ -442,6 +443,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
 
 
     let accumulatedContent = "";
+    let accumulatedThinking = ""; // Dedicated thinking accumulator
     const accumulatedSteps: string[] = [];
     let accumulatedImageUrls: string[] = [];
     let accumulatedNasFiles: NasFileResult[] = [];
@@ -499,12 +501,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
               break;
 
             case "thinking": {
-              // Server emits consolidated reasoning at end of turn.
-              // Inject as <think> block so parseStructuredContent() routes
-              // it to the thinking section, NOT the visible response.
+              // Dedicated thinking event — accumulate separately
               const thinkContent = event.content || "";
-              if (thinkContent && !accumulatedContent.includes("<think>")) {
-                accumulatedContent = `<think>\n${thinkContent}\n</think>\n${accumulatedContent}`;
+              if (thinkContent && !accumulatedThinking.includes(thinkContent)) {
+                accumulatedThinking += (accumulatedThinking ? "\n\n" : "") + thinkContent;
               }
               break;
             }
@@ -604,13 +604,15 @@ export const useChatStore = create<ChatState>()((set, get) => {
           if (_generationId !== myGeneration) break;
           const currentMessages = get().messages;
           const parsed = parseStructuredContent(accumulatedContent);
+          const streamThinking = parsed.thinking || accumulatedThinking;
           const displayContent = get().isLoading
-            ? stripIncompleteImageMarkdown(parsed)
-            : parsed;
+            ? stripIncompleteImageMarkdown(parsed.content)
+            : parsed.content;
 
           const updatedAssistant: Message = {
             ...currentMessages[currentMessages.length - 1],
             content: displayContent,
+            thinking_content: streamThinking,
             steps: [...accumulatedSteps],
             image_urls: [...accumulatedImageUrls],
             nas_files: [...accumulatedNasFiles],
@@ -680,16 +682,17 @@ export const useChatStore = create<ChatState>()((set, get) => {
         ? Math.round((Date.now() - streamStarted.getTime()) / 1000)
         : 0;
 
-      const finalContent = parseStructuredContent(accumulatedContent);
-      const hasThinking =
-        finalContent.includes("<think>") && finalContent.includes("</think>");
+      const finalParsed = parseStructuredContent(accumulatedContent);
+      const finalThinking = finalParsed.thinking || accumulatedThinking;
+      const hasThinking = finalThinking.length > 0 || lastMsg?.steps?.length > 0;
 
       set({
         messages: [
           ...finalMessages.slice(0, -1),
           {
             ...lastMsg,
-            content: finalContent,
+            content: finalParsed.content,
+            thinking_content: finalThinking,
             steps: [...accumulatedSteps],
             image_urls: [...accumulatedImageUrls],
             nas_files: [...accumulatedNasFiles],
@@ -763,18 +766,22 @@ export const useChatStore = create<ChatState>()((set, get) => {
     try {
       const data = await apiClient.getConversation(conversationId);
       // Normalize server roles to UI roles and group blocks into turns
-      const rawMessages: Message[] = data.messages.map((m) => ({
-        ...m,
-        role: normalizeRole(m.role || "assistant"),
-        content: parseStructuredContent(m.content || ""),
-        created_at: m.created_at || new Date().toISOString(),
-        steps: m.steps || [],
-        thinking_duration_sec: m.thinking_duration_sec || 0,
-        image_urls: m.image_urls || [],
-        attachments: m.attachments || [],
-        nas_files: m.nas_files || [],
-        parts: m.parts || [],
-      }));
+      const rawMessages: Message[] = data.messages.map((m) => {
+        const parsed = parseStructuredContent(m.content || "");
+        return {
+          ...m,
+          role: normalizeRole(m.role || "assistant"),
+          content: parsed.content,
+          thinking_content: m.thinking_content || parsed.thinking || "",
+          created_at: m.created_at || new Date().toISOString(),
+          steps: m.steps || [],
+          thinking_duration_sec: m.thinking_duration_sec || 0,
+          image_urls: m.image_urls || [],
+          attachments: m.attachments || [],
+          nas_files: m.nas_files || [],
+          parts: m.parts || [],
+        };
+      });
 
       set({
         conversationId,
@@ -797,6 +804,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           const assistantPlaceholder: Message = {
             role: "assistant",
             content: "",
+            thinking_content: "",
             created_at: new Date().toISOString(),
             steps: [],
             thinking_duration_sec: 0,
@@ -818,6 +826,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           });
 
           let accumulatedContent = "";
+          let accumulatedThinking = ""; // Dedicated thinking accumulator
           const accumulatedSteps: string[] = [];
           let accumulatedImageUrls: string[] = [];
           let accumulatedNasFiles: NasFileResult[] = [];
@@ -836,6 +845,13 @@ export const useChatStore = create<ChatState>()((set, get) => {
                 case "token":
                   accumulatedContent += event.content || "";
                   break;
+                case "thinking": {
+                  const thinkChunk = event.content || "";
+                  if (thinkChunk && !accumulatedThinking.includes(thinkChunk)) {
+                    accumulatedThinking += (accumulatedThinking ? "\n\n" : "") + thinkChunk;
+                  }
+                  break;
+                }
                 case "activity":
                   set({ currentActivity: event.content || null });
                   break;
@@ -892,9 +908,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
               if (_generationId !== myGeneration) break;
               const msgs = get().messages;
               const parsed = parseStructuredContent(accumulatedContent);
+              const streamThinking = parsed.thinking || accumulatedThinking;
               const displayContent = get().isLoading
-                ? stripIncompleteImageMarkdown(parsed)
-                : parsed;
+                ? stripIncompleteImageMarkdown(parsed.content)
+                : parsed.content;
 
               set({
                 messages: [
@@ -902,6 +919,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
                   {
                     ...msgs[msgs.length - 1],
                     content: displayContent,
+                    thinking_content: streamThinking,
                     steps: [...accumulatedSteps],
                     image_urls: [...accumulatedImageUrls],
                     nas_files: [...accumulatedNasFiles],
@@ -914,17 +932,21 @@ export const useChatStore = create<ChatState>()((set, get) => {
             // On error, try reloading messages from DB
             try {
               const freshData = await apiClient.getConversation(conversationId);
-              const freshMessages: Message[] = freshData.messages.map((m) => ({
-                ...m,
-                role: normalizeRole(m.role || "assistant"),
-                content: parseStructuredContent(m.content || ""),
-                created_at: m.created_at || new Date().toISOString(),
-                steps: m.steps || [],
-                thinking_duration_sec: m.thinking_duration_sec || 0,
-                image_urls: m.image_urls || [],
-                attachments: m.attachments || [],
-                nas_files: m.nas_files || [],
-              }));
+              const freshMessages: Message[] = freshData.messages.map((m) => {
+                const parsed = parseStructuredContent(m.content || "");
+                return {
+                  ...m,
+                  role: normalizeRole(m.role || "assistant"),
+                  content: parsed.content,
+                  thinking_content: m.thinking_content || parsed.thinking || "",
+                  created_at: m.created_at || new Date().toISOString(),
+                  steps: m.steps || [],
+                  thinking_duration_sec: m.thinking_duration_sec || 0,
+                  image_urls: m.image_urls || [],
+                  attachments: m.attachments || [],
+                  nas_files: m.nas_files || [],
+                };
+              });
               set({ messages: groupBlocksIntoTurns(freshMessages) });
             } catch {
               // Silent — keep whatever we have
@@ -943,9 +965,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
               ? Math.round((Date.now() - streamStarted.getTime()) / 1000)
               : 0;
 
-            const finalContent = parseStructuredContent(accumulatedContent);
-            const hasThinking =
-              finalContent.includes("<think>") && finalContent.includes("</think>");
+            const finalParsed = parseStructuredContent(accumulatedContent);
+            const finalThinking = finalParsed.thinking || accumulatedThinking;
+            const hasThinking = finalThinking.length > 0 || lastMsg?.steps?.length > 0;
 
             if (accumulatedContent) {
               set({
@@ -953,7 +975,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
                   ...finalMessages.slice(0, -1),
                   {
                     ...lastMsg,
-                    content: finalContent,
+                    content: finalParsed.content,
+                    thinking_content: finalThinking,
                     steps: [...accumulatedSteps],
                     image_urls: [...accumulatedImageUrls],
                     nas_files: [...accumulatedNasFiles],
@@ -1243,14 +1266,17 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
           }
           i++;
         } else if (b.role === "assistant") {
-          // This is the actual response (was final_answer on server, normalized to assistant)
+          // This is the actual response — use it directly (no more <think> injection)
           const sanitized = b.content;
-          if (sanitized.includes("<think>")) {
-            // Content has embedded thinking — use it directly
-            assistantContent = sanitized;
-          } else if (thinkContent) {
-            // We have thinking from THINKING blocks — wrap and prepend
-            assistantContent = `<think>\n${thinkContent}\n</think>\n${sanitized}`;
+          // Extract any embedded <think> tags and move to thinkContent
+          const embeddedThink = sanitized.match(/<think>([\s\S]*?)(?:<\/think>|$)/i);
+          if (embeddedThink) {
+            const extracted = embeddedThink[1]?.trim() || "";
+            if (extracted && !thinkContent.includes(extracted)) {
+              thinkContent += (thinkContent ? "\n" : "") + extracted;
+            }
+            // Strip the <think> tags from the visible content
+            assistantContent = sanitized.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
           } else {
             assistantContent = sanitized;
           }
@@ -1270,13 +1296,14 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
       // If we collected thinking/tool blocks but never found an assistant block,
       // still show the thinking content
       if (!foundAssistant && thinkContent) {
-        assistantContent = `<think>\n${thinkContent}\n</think>`;
+        assistantContent = ""; // Thinking-only turn, no visible content
       }
 
-      if (assistantContent || steps.length > 0) {
+      if (assistantContent || thinkContent || steps.length > 0) {
         result.push({
           role: "assistant",
           content: assistantContent.trim(),
+          thinking_content: thinkContent.trim(),
           created_at: block.created_at,
           steps,
           thinking_duration_sec: thinkingDuration,

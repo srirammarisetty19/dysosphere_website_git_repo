@@ -13,7 +13,7 @@
 // File reference displayed as subtitle on NAS InPlace AI tiles.
 // ============================================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Plus,
   Search,
@@ -31,8 +31,10 @@ import {
   ChevronRight,
   ChevronDown,
   MessagesSquare,
+  Loader2,
 } from "lucide-react";
 import { useChatStore } from "@/stores/chat-store";
+import { apiClient } from "@/lib/api-client";
 import { DSLogo } from "@/components/ui/ds-logo";
 import type { Conversation } from "@/lib/types";
 
@@ -58,6 +60,14 @@ function getNasFilename(c: Conversation): string {
   if (c.metadata?.source_file?.filename) return c.metadata.source_file.filename;
   const title = c.title ?? "";
   return title.startsWith("📎 ") ? title.slice(2).trim() : title;
+}
+
+// ── Search Result Type ──────────────────────────────────────────────────────
+
+interface SearchResult {
+  session_id: string;
+  session_title: string;
+  content_snippet: string;
 }
 
 // ── Section Header ──────────────────────────────────────────────────────────
@@ -227,6 +237,12 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
 
+  // Server-side search state
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // Section open state — NAS & Reminders default collapsed, Regular open
   const [nasOpen, setNasOpen] = useState(false);
   const [remindersOpen, setRemindersOpen] = useState(false);
@@ -236,10 +252,62 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
     loadConversations();
   }, [loadConversations]);
 
+  // Keyboard shortcut: Cmd+K to focus search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Debounced server-side search (fires after 300ms pause, for queries ≥ 3 chars)
+  const performSearch = useCallback(async (query: string) => {
+    if (query.length < 3) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const data = await apiClient.searchHistory(query);
+      setSearchResults(data.results || []);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    // Clear previous debounce timer
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (value.length >= 3) {
+      searchTimerRef.current = setTimeout(() => performSearch(value), 300);
+    } else {
+      setSearchResults([]);
+      setIsSearching(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setSearchResults([]);
+    setIsSearching(false);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+  };
+
+  // Determine if we're in "deep search" mode (server-side search active)
+  const isDeepSearchMode = searchQuery.length >= 3;
+
   const filteredConversations = conversations.filter((c) =>
-    searchQuery
+    searchQuery && !isDeepSearchMode
       ? (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())
-      : true
+      : !isDeepSearchMode // show all when not searching
   );
 
   // Partition into categories
@@ -347,23 +415,93 @@ export function ChatSidebar({ isOpen, onClose }: ChatSidebarProps) {
         {/* Search */}
         <div className="px-3 pb-2">
           <div className="relative">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20"
-            />
+            {isSearching ? (
+              <Loader2
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-accent-blue)]/50 animate-spin"
+              />
+            ) : (
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20"
+              />
+            )}
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder="Search conversations..."
+              placeholder="Search conversations... ⌘K"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 bg-white/[0.04] rounded-lg text-white text-xs placeholder:text-white/15 border border-transparent focus:border-white/10 focus:outline-none transition-colors"
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  clearSearch();
+                  e.currentTarget.blur();
+                }
+              }}
+              className="w-full pl-8 pr-8 py-2 bg-white/[0.04] rounded-lg text-white text-xs placeholder:text-white/15 border border-transparent focus:border-white/10 focus:outline-none transition-colors"
             />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-white/20 hover:text-white/50 transition-colors"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Conversation List */}
+        {/* Conversation List / Search Results */}
         <div className="flex-1 overflow-y-auto">
-          {totalCount === 0 ? (
+          {isDeepSearchMode ? (
+            /* ── Deep Search Results (server-side) ─────────────────── */
+            <div className="py-1">
+              <div className="flex items-center gap-2 px-4 py-1.5">
+                <Search size={11} className="text-[var(--color-accent-blue)]/40" />
+                <span className="text-white/30 text-[11px] font-semibold uppercase tracking-[0.08em]">
+                  Search Results
+                </span>
+                {!isSearching && (
+                  <span className="text-[10px] text-white/20 bg-white/[0.05] px-1.5 py-0.5 rounded-full">
+                    {searchResults.length}
+                  </span>
+                )}
+              </div>
+
+              {isSearching ? (
+                <div className="px-4 py-8 text-center">
+                  <Loader2 className="animate-spin text-white/15 mx-auto mb-2" size={18} />
+                  <p className="text-white/20 text-[10px]">Searching messages...</p>
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <Search size={20} className="text-white/10 mx-auto mb-2" />
+                  <p className="text-white/25 text-xs">No results found</p>
+                  <p className="text-white/15 text-[10px] mt-1">Try different keywords</p>
+                </div>
+              ) : (
+                <div className="px-2 space-y-0.5">
+                  {searchResults.map((result) => (
+                    <button
+                      key={result.session_id}
+                      onClick={() => {
+                        handleSelectConversation(result.session_id);
+                        clearSearch();
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/[0.04] border border-transparent hover:border-white/[0.06] transition-colors"
+                    >
+                      <p className="text-white/60 text-[13px] truncate leading-tight font-medium">
+                        {result.session_title || "Untitled"}
+                      </p>
+                      <p className="text-white/30 text-[11px] mt-1 line-clamp-2 leading-relaxed">
+                        ...{result.content_snippet}...
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : totalCount === 0 ? (
             <div className="px-4 py-8 text-center">
               <MessageSquare size={24} className="text-white/10 mx-auto mb-2" />
               <p className="text-white/20 text-xs">

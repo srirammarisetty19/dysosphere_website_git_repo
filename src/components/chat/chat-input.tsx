@@ -20,7 +20,9 @@ import {
   FileAudio,
   FileVideo,
   File as FileIcon,
+  Loader2,
 } from "lucide-react";
+import { useGpuStatus } from "@/stores/gpu-store";
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: File[]) => void;
@@ -38,6 +40,8 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const gpuStatus = useGpuStatus();
+  const isWarmingUp = gpuStatus?.gpu_state === "swapping_to_ai";
 
   // Auto-resize textarea
   useEffect(() => {
@@ -67,6 +71,30 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
     };
     document.addEventListener("keydown", handleGlobalKey);
     return () => document.removeEventListener("keydown", handleGlobalKey);
+  }, []);
+
+  // Clipboard paste: detect image data and add as attachment
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          e.preventDefault();
+          const blob = items[i].getAsFile();
+          if (blob) {
+            const file = new File([blob], `pasted_image_${Date.now()}.png`, {
+              type: blob.type,
+            });
+            setAttachments((prev) => [...prev, file]);
+          }
+          break;
+        }
+      }
+    };
+    const textarea = textareaRef.current;
+    textarea?.addEventListener("paste", handlePaste);
+    return () => textarea?.removeEventListener("paste", handlePaste);
   }, []);
 
   const handleSend = useCallback(() => {
@@ -217,6 +245,22 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
       onDrop={handleDrop}
     >
       <div className="max-w-3xl mx-auto">
+        {/* GPU warm-up notice (server gpu_state === "swapping_to_ai") */}
+        {isWarmingUp && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-2.5 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-400/[0.07] border border-amber-400/15 animate-in"
+          >
+            <Loader2 size={13} className="animate-spin text-amber-300/80 shrink-0" />
+            <span className="text-amber-200/70 text-xs">
+              {isLoading
+                ? "AI model is loading — your reply will start shortly."
+                : "AI model is warming up — the first reply may take a moment."}
+            </span>
+          </div>
+        )}
+
         {/* Drag overlay */}
         {isDragging && (
           <div className="mb-3 flex items-center justify-center py-6 rounded-2xl border-2 border-dashed border-[var(--color-accent-blue)]/30 bg-[var(--color-accent-blue)]/5 transition-all">

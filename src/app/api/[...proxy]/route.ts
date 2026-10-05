@@ -71,6 +71,11 @@ async function proxyRequest(req: NextRequest, params: { proxy: string[] }) {
     // AI routes: existing mapping
     const serverPrefix = AI_ROUTE_MAP[firstSegment] || firstSegment;
     serverPath = restPath ? `${serverPrefix}/${restPath}` : serverPrefix;
+    // FastAPI collection routes declared as "/" need the trailing slash
+    // (avoids a 307 redirect round-trip).
+    if (!restPath && (serverPrefix === "tools" || serverPrefix === "skills")) {
+      serverPath += "/";
+    }
   }
 
   // Build target URL with query params

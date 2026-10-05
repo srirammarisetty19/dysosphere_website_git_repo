@@ -48,6 +48,7 @@ import {
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  thinkingContent?: string; // Pre-parsed thinking text
   timestamp: Date;
   imageUrls?: string[];
 }
@@ -122,8 +123,9 @@ function getQuickActions(fileType: string): QuickAction[] {
  * Ported from the main AI chat-store's parseStructuredContent + _parseStructuredResponse.
  * This handles streaming content where tags may be incomplete.
  */
-function parseStructuredContent(raw: string): string {
+function parseStructuredContent(raw: string): { content: string; thinking: string } {
   let visible = "";
+  let thinking = "";
   let currentTag = "none";
   let pos = 0;
 
@@ -151,10 +153,11 @@ function parseStructuredContent(raw: string): string {
       if (
         currentTag === "<reasoning>" ||
         currentTag === "<think>" ||
-        currentTag === "<thought>" ||
-        currentTag === "<tool_call>"
+        currentTag === "<thought>"
       ) {
-        // Inside hidden tag — discard
+        thinking += chunk;
+      } else if (currentTag === "<tool_call>") {
+        // Discard tool call content
       } else {
         // Visible text — strip partial tags at the end
         const partialMatch = chunk.match(/<\/?[a-zA-Z_]*$/);
@@ -167,10 +170,11 @@ function parseStructuredContent(raw: string): string {
     if (
       currentTag === "<reasoning>" ||
       currentTag === "<think>" ||
-      currentTag === "<thought>" ||
-      currentTag === "<tool_call>"
+      currentTag === "<thought>"
     ) {
-      // Inside hidden tag — discard
+      thinking += chunk;
+    } else if (currentTag === "<tool_call>") {
+      // Discard
     } else if (currentTag === "none" || currentTag === "<response>") {
       visible += chunk;
     }
@@ -187,7 +191,7 @@ function parseStructuredContent(raw: string): string {
   result = result.replace(/^## ASSISTANT:?\s*/gm, "");
   // Strip leading blank lines that appear before the actual response
   result = result.replace(/^\s*\n+/, "");
-  return result.trim();
+  return { content: result.trim(), thinking: thinking.trim() };
 }
 
 /** Strip incomplete image markdown during streaming */
@@ -207,6 +211,10 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
   const [showChips, setShowChips] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const rawAccumulatedRef = useRef("");
+  const thinkingAccumulatedRef = useRef(""); // Dedicated thinking accumulator
+  const [streamingThinking, setStreamingThinking] = useState("");
+  const [thinkingElapsed, setThinkingElapsed] = useState(0);
+  const thinkingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -242,7 +250,15 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
       setStreamingContent("");
       setStreamingImageUrls([]);
       rawAccumulatedRef.current = "";
+      thinkingAccumulatedRef.current = "";
+      setStreamingThinking("");
+      setThinkingElapsed(0);
       setCurrentActivity("💭 Thinking...");
+      // Start thinking timer
+      const startTime = Date.now();
+      thinkingTimerRef.current = setInterval(() => {
+        setThinkingElapsed(Math.round((Date.now() - startTime) / 1000));
+      }, 1000);
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
@@ -307,23 +323,27 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
                   case "token":
                     // Accumulate raw tokens, parse to strip XML tags
                     rawAccumulatedRef.current += event.content || "";
-                    // Clear activity label once real content starts flowing
-                    // (prevents stale tool status from persisting)
                     setCurrentActivity("");
-                    setStreamingContent(
-                      stripIncompleteImageMarkdown(
-                        parseStructuredContent(rawAccumulatedRef.current)
-                      )
-                    );
+                    {
+                      const parsed = parseStructuredContent(rawAccumulatedRef.current);
+                      if (parsed.thinking && !thinkingAccumulatedRef.current.includes(parsed.thinking)) {
+                        thinkingAccumulatedRef.current = parsed.thinking;
+                        setStreamingThinking(parsed.thinking);
+                      }
+                      setStreamingContent(
+                        stripIncompleteImageMarkdown(parsed.content)
+                      );
+                    }
                     break;
                   case "thinking":
-                    // Thinking tokens — accumulate but parse will strip <think> tags
-                    rawAccumulatedRef.current += event.content || "";
-                    setStreamingContent(
-                      stripIncompleteImageMarkdown(
-                        parseStructuredContent(rawAccumulatedRef.current)
-                      )
-                    );
+                    // Dedicated thinking event — accumulate separately
+                    {
+                      const thinkContent = event.content || "";
+                      if (thinkContent && !thinkingAccumulatedRef.current.includes(thinkContent)) {
+                        thinkingAccumulatedRef.current += (thinkingAccumulatedRef.current ? "\n\n" : "") + thinkContent;
+                        setStreamingThinking(thinkingAccumulatedRef.current);
+                      }
+                    }
                     break;
                   case "session":
                   case "session_id":
@@ -379,13 +399,15 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
         }
 
         // Finalize — apply full parser to the raw accumulated response
-        const finalContent = parseStructuredContent(rawAccumulatedRef.current);
-        if (finalContent) {
+        const finalParsed = parseStructuredContent(rawAccumulatedRef.current);
+        const finalThinking = thinkingAccumulatedRef.current || finalParsed.thinking;
+        if (finalParsed.content) {
           setMessages((prev) => [
             ...prev,
             {
               role: "assistant",
-              content: finalContent,
+              content: finalParsed.content,
+              thinkingContent: finalThinking || undefined,
               timestamp: new Date(),
               imageUrls: currentImageUrls.length > 0 ? [...currentImageUrls] : undefined,
             },
@@ -407,7 +429,10 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
         setIsLoading(false);
         setCurrentActivity("");
         setStreamingImageUrls([]);
+        setStreamingThinking("");
+        if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
         rawAccumulatedRef.current = "";
+        thinkingAccumulatedRef.current = "";
         abortControllerRef.current = null;
       }
     },
@@ -416,13 +441,15 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
 
   const stopGeneration = () => {
     abortControllerRef.current?.abort();
-    const finalContent = parseStructuredContent(rawAccumulatedRef.current);
-    if (finalContent) {
+    const finalParsed = parseStructuredContent(rawAccumulatedRef.current);
+    const finalThinking = thinkingAccumulatedRef.current || finalParsed.thinking;
+    if (finalParsed.content) {
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: finalContent,
+          content: finalParsed.content,
+          thinkingContent: finalThinking || undefined,
           timestamp: new Date(),
           imageUrls: streamingImageUrls.length > 0 ? [...streamingImageUrls] : undefined,
         },
@@ -536,6 +563,14 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
                   >
                     {msg.role === "assistant" ? (
                       <>
+                        {/* Compact thinking panel for finalized messages */}
+                        {msg.thinkingContent && (
+                          <CompactThinkingPanel
+                            thinkingContent={msg.thinkingContent}
+                            isStreaming={false}
+                            elapsed={0}
+                          />
+                        )}
                         <div className="gemini-prose prose prose-sm prose-invert max-w-none">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {msg.content}
@@ -600,20 +635,31 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
               ))}
 
               {/* Streaming content */}
-              {streamingContent && (
+              {(streamingContent || streamingThinking) && (
                 <div className="flex justify-start" style={{ animation: "message-in 0.2s ease-out" }}>
                   <div className="max-w-[85%] rounded-2xl rounded-bl-md px-4 py-2.5 text-sm bg-white/[0.04] border border-border-subtle text-text-secondary">
-                    <div className="gemini-prose prose prose-sm prose-invert max-w-none">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {streamingContent}
-                      </ReactMarkdown>
-                    </div>
+                    {/* Compact thinking panel during streaming */}
+                    {(streamingThinking || currentActivity) && (
+                      <CompactThinkingPanel
+                        thinkingContent={streamingThinking}
+                        isStreaming={true}
+                        elapsed={thinkingElapsed}
+                        activity={currentActivity}
+                      />
+                    )}
+                    {streamingContent && (
+                      <div className="gemini-prose prose prose-sm prose-invert max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {streamingContent}
+                        </ReactMarkdown>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
               {/* Loading indicator */}
-              {isLoading && !streamingContent && (
+              {isLoading && !streamingContent && !streamingThinking && (
                 <div className="flex justify-start" style={{ animation: "message-in 0.2s ease-out" }}>
                   <div className="rounded-2xl rounded-bl-md px-4 py-3 bg-white/[0.04] border border-border-subtle flex items-center gap-2">
                     <div className="flex gap-1">
@@ -818,3 +864,80 @@ function NasUserActionRow({
   );
 }
 
+
+// ── Compact Thinking Panel ──────────────────────────────────────────────
+// Shows thinking status during streaming and collapsible reasoning on
+// finalized messages. Compact design for the slide-over context.
+
+function CompactThinkingPanel({
+  thinkingContent,
+  isStreaming,
+  elapsed,
+  activity,
+}: {
+  thinkingContent: string;
+  isStreaming: boolean;
+  elapsed: number;
+  activity?: string;
+}) {
+  const [expanded, setExpanded] = useState(isStreaming);
+
+  const elapsedLabel =
+    elapsed <= 0 ? "" : elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+
+  const headerLabel = isStreaming
+    ? activity || "💭 Thinking..."
+    : elapsedLabel
+      ? `Thought for ${elapsedLabel}`
+      : "Thought process";
+
+  return (
+    <div
+      className={`rounded-lg border mb-2 transition-colors ${
+        isStreaming
+          ? "border-[var(--color-accent-blue)]/25 bg-white/[0.02]"
+          : "border-white/[0.06] bg-white/[0.01]"
+      }`}
+    >
+      {/* Header */}
+      <button
+        onClick={() => thinkingContent && setExpanded(!expanded)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/[0.02] transition-colors rounded-lg"
+      >
+        <Sparkles
+          size={12}
+          className={isStreaming ? "text-[var(--color-accent-blue)] animate-pulse" : "text-white/40"}
+        />
+        <span
+          className={`flex-1 text-[11px] truncate ${
+            isStreaming ? "text-white/70 font-medium" : "text-white/40"
+          }`}
+        >
+          {headerLabel}
+        </span>
+        {isStreaming && elapsedLabel && (
+          <span className="text-white/25 text-[10px]">{elapsedLabel}</span>
+        )}
+        {thinkingContent && (
+          <svg
+            className={`w-3 h-3 text-white/30 transition-transform ${expanded ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </button>
+
+      {/* Expanded content */}
+      {expanded && thinkingContent && (
+        <div className="border-t border-white/[0.06] px-3 py-2">
+          <p className="text-[10.5px] text-white/25 italic leading-relaxed line-clamp-6">
+            {thinkingContent}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -23,10 +23,13 @@ import {
   Send,
   Trash2,
   Menu,
+  Wrench,
+  Search,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api-client";
+import type { ToolInfo } from "@/lib/types";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -66,6 +69,9 @@ export default function SettingsPage() {
 
         {/* Server Info */}
         <ServerSection activeAccount={activeAccount} />
+
+        {/* AI Tools (GET /tools/) */}
+        <ToolsSection />
 
         {/* Sign Out */}
         <div className="pt-2 pb-8 space-y-3">
@@ -503,6 +509,136 @@ function ServerSection({ activeAccount }: { activeAccount: { serverUrl: string; 
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── AI Tools Section ───────────────────────────────────────────────────
+// Read-only list of tools the assistant can use on this server.
+function ToolsSection() {
+  const [expanded, setExpanded] = useState(false);
+  const [tools, setTools] = useState<ToolInfo[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [openTool, setOpenTool] = useState<string | null>(null);
+
+  // Lazy-load on first expand (from the click handler, not an effect).
+  // Re-opening after an error retries.
+  const handleToggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (!next || loading || tools !== null) return;
+    setLoading(true);
+    setError(null);
+    apiClient
+      .getAvailableTools()
+      .then((list) => setTools([...list].sort((a, b) => a.name.localeCompare(b.name))))
+      .catch((e) => setError(e instanceof Error ? e.message : "Couldn't load tools"))
+      .finally(() => setLoading(false));
+  };
+
+  const q = query.trim().toLowerCase();
+  const filtered = (tools ?? []).filter(
+    (t) => !q || t.name.toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q)
+  );
+
+  return (
+    <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] overflow-hidden">
+      <div className="p-5">
+        <SectionHeader
+          icon={<Wrench size={16} />}
+          label="AI Tools"
+          color="#7C4DFF"
+          expanded={expanded}
+          onToggle={handleToggle}
+          trailing={
+            tools !== null ? (
+              <span className="text-white/25 text-[11px] mr-2 tabular-nums">{tools.length}</span>
+            ) : undefined
+          }
+        />
+
+        {expanded && (
+          <div className="mt-4 space-y-3">
+            <p className="text-white/30 text-xs leading-relaxed">
+              Capabilities the assistant can use automatically while answering. This list comes from your server.
+            </p>
+
+            {loading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="animate-spin text-[#7C4DFF]" size={20} />
+              </div>
+            ) : error ? (
+              <StatusMessage type="error" text={error} />
+            ) : (
+              <>
+                {(tools?.length ?? 0) > 6 && (
+                  <div className="relative">
+                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
+                    <input
+                      id="settings-tools-search"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search tools"
+                      className="w-full pl-9 pr-3 py-2 bg-white/[0.04] rounded-xl text-white text-sm placeholder:text-white/15 border border-transparent focus:border-[#7C4DFF]/40 focus:outline-none transition-colors"
+                    />
+                  </div>
+                )}
+                {filtered.length === 0 ? (
+                  <p className="text-white/25 text-xs text-center py-4">
+                    {q ? `No tools match “${query}”` : "No tools are registered on this server."}
+                  </p>
+                ) : (
+                  <div className="max-h-[420px] overflow-y-auto -mx-1 px-1 space-y-1.5">
+                    {filtered.map((tool) => {
+                      const params = tool.schema?.function?.parameters;
+                      const props = Object.entries(params?.properties ?? {});
+                      const required = new Set(params?.required ?? []);
+                      const open = openTool === tool.name;
+                      return (
+                        <div key={tool.name} className="rounded-xl bg-white/[0.025] border border-white/[0.04]">
+                          <button
+                            onClick={() => setOpenTool(open ? null : tool.name)}
+                            className="w-full text-left px-3.5 py-2.5"
+                            aria-expanded={open}
+                          >
+                            <div className="flex items-center gap-2">
+                              <code className="text-[12px] text-[#B39DFF] font-mono">{tool.name}</code>
+                              {props.length > 0 && (
+                                <span className="text-white/20 text-[10px]">
+                                  {props.length} param{props.length > 1 ? "s" : ""}
+                                </span>
+                              )}
+                            </div>
+                            <p className={`text-white/40 text-xs mt-0.5 leading-relaxed ${open ? "" : "line-clamp-2"}`}>
+                              {tool.description || "No description"}
+                            </p>
+                          </button>
+                          {open && props.length > 0 && (
+                            <div className="px-3.5 pb-3 space-y-1.5">
+                              {props.map(([pname, p]) => (
+                                <div key={pname} className="flex gap-2 text-[11px]">
+                                  <code className="text-white/60 font-mono shrink-0">
+                                    {pname}
+                                    {required.has(pname) && <span className="text-[#FF8A80]">*</span>}
+                                  </code>
+                                  {p.type && <span className="text-white/20 shrink-0">{p.type}</span>}
+                                  {p.description && <span className="text-white/35">{p.description}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

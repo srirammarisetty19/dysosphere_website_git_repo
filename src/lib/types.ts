@@ -77,6 +77,7 @@ export interface MessagePart {
 export interface Message {
   role: MessageRole;
   content: string;
+  thinking_content: string; // Pre-parsed thinking text (structured, not <think> tags)
   created_at: string;
   steps: string[];
   thinking_duration_sec: number;
@@ -184,13 +185,88 @@ export interface Heartbeat {
   last_run?: string;
 }
 
+// Server: GET /heartbeats/{id}/results — `result` is truncated to 500 chars.
+export interface HeartbeatResult {
+  id: string;
+  result: string | null;
+  error: string | null;
+  session_id: string | null;
+  duration_ms: number | null;
+  created_at: string | null;
+}
+
 // ── GPU Status ──────────────────────────────────────────────────────────
+// Server: GET /gpu/status (GpuStatusResponse)
+
+export type GpuState = "ai_ready" | "nas_processing" | "swapping_to_ai" | "unknown";
 
 export interface GpuStatus {
-  gpu_loaded: boolean;
-  vram_used_mb?: number;
-  vram_total_mb?: number;
-  active_users: number;
+  llama_loaded: boolean;
+  nas_processing: boolean;
+  active_sessions: number;
+  gpu_state: GpuState | string;
+}
+
+// ── Tools ───────────────────────────────────────────────────────────────
+// Server: GET /tools/ → { tools: ToolInfo[], total }
+
+export interface ToolInfo {
+  name: string;
+  description: string;
+  // OpenAI-compatible function schema (tools/base_tool.py → to_function_schema)
+  schema?: {
+    type?: "function";
+    function?: {
+      name?: string;
+      description?: string;
+      parameters?: {
+        type?: string;
+        properties?: Record<string, { type?: string; description?: string; enum?: unknown[] }>;
+        required?: string[];
+      };
+    };
+  };
+}
+
+// ── Skills ──────────────────────────────────────────────────────────────
+// Server: /skills/* — identity comes from the auth token.
+
+/** Built-in filesystem skill (read-only). GET /skills/ → central_skills[] */
+export interface CentralSkill {
+  name: string;
+  description: string;
+  category: string;
+  active: boolean;
+  source: "central";
+}
+
+/** Per-user DB skill. GET /skills/user (content truncated) or /skills/user/{id} (full). */
+export interface UserSkill {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  triggers: string[] | null;
+  example_queries: string[] | null;
+  tools_used: string[] | null;
+  auto_load: boolean;
+  enabled: boolean;
+  source: string;            // "manual" | "template" | "api"
+  template_id: string | null;
+  created_at: string | null;
+  updated_at?: string | null;
+}
+
+/** Fields accepted by POST /skills/user and PUT /skills/user/{id}. */
+export interface UserSkillInput {
+  name?: string;
+  description?: string;
+  content?: string;
+  triggers?: string[];
+  example_queries?: string[];
+  tools_used?: string[];
+  auto_load?: boolean;
+  enabled?: boolean;
 }
 
 // ── Upload ──────────────────────────────────────────────────────────────

@@ -25,9 +25,14 @@ import type {
   Session,
   AgentMetadata,
   Heartbeat,
+  HeartbeatResult,
   GpuStatus,
   UploadResult,
   StreamEvent,
+  ToolInfo,
+  CentralSkill,
+  UserSkill,
+  UserSkillInput,
 } from "./types";
 
 class ApiClientError extends Error {
@@ -64,6 +69,7 @@ const ROUTE_MAP: Record<string, string> = {
   images: "images",
   webhooks: "webhooks",
   scheduler: "scheduler",
+  skills: "skills",
 };
 
 class ApiClient {
@@ -361,7 +367,10 @@ class ApiClient {
     const rest = segments.slice(1).join("/");
 
     const mapped = ROUTE_MAP[namespace] || namespace;
-    const serverPath = rest ? `${mapped}/${rest}` : mapped;
+    // segments.length > 1 preserves a trailing slash ("tools/" → "tools/").
+    // FastAPI routes declared as "/" (e.g. /tools/, /skills/) otherwise 307-redirect,
+    // which breaks behind the Cloudflare → nginx proxy chain.
+    const serverPath = segments.length > 1 ? `${mapped}/${rest}` : mapped;
 
     return `${server}/api/ai/${serverPath}`;
   }
@@ -742,6 +751,7 @@ class ApiClient {
         return {
           role: m.role as Message["role"],
           content: m.content || "",
+          thinking_content: (m.metadata?.thinking_content as string) || "",
           created_at: m.timestamp || new Date().toISOString(),
           steps: (m.metadata?.steps as string[]) || [],
           thinking_duration_sec: (m.metadata?.thinking_duration_sec as number) || 0,
@@ -814,13 +824,10 @@ class ApiClient {
     return data.agents;
   }
 
-  async getAvailableTools(): Promise<Array<{ name: string; description: string }>> {
-    return this.request("/api/agents/tools");
-  }
-
-  async getModels(): Promise<string[]> {
-    const data = await this.request<{ models: string[] }>("/api/agents/models");
-    return data.models;
+  /** Server: GET /tools/ → { tools: ToolInfo[], total } */
+  async getAvailableTools(): Promise<ToolInfo[]> {
+    const data = await this.request<{ tools: ToolInfo[]; total: number }>("/api/tools/");
+    return data.tools ?? [];
   }
 
   // ── Run Status (Gemini-style auto-resume) ────────────────────────────
@@ -1029,9 +1036,59 @@ class ApiClient {
   }
 
   // ── Heartbeat Results ───────────────────────────────────────────────
+  // Server: GET /heartbeats/{id}/results?limit= (most recent first, limit 1-100)
 
-  async getHeartbeatResults(id: string, limit = 20): Promise<{ results: Array<{ id: string; content: string; created_at: string }> }> {
+  async getHeartbeatResults(id: string, limit = 20): Promise<{ results: HeartbeatResult[]; total: number }> {
     return this.request(`/api/heartbeats/${id}/results?limit=${limit}`);
+  }
+
+  // ── Skills ──────────────────────────────────────────────────────────────
+  // Server: /skills/* — the user is identified by the Bearer token only.
+
+  /** Built-in (central) skills + summary of the user's skills. */
+  async getSkills(): Promise<{ central_skills: CentralSkill[]; total: number }> {
+    return this.request("/api/skills/");
+  }
+
+  /** The user's skills with metadata. `content` is truncated to 200 chars. */
+  async getUserSkills(): Promise<UserSkill[]> {
+    const data = await this.request<{ skills: UserSkill[]; total: number }>("/api/skills/user");
+    return data.skills ?? [];
+  }
+
+  /** One user skill with full content (use before editing). */
+  async getUserSkill(id: string): Promise<UserSkill> {
+    return this.request(`/api/skills/user/${encodeURIComponent(id)}`);
+  }
+
+  async createUserSkill(data: UserSkillInput & { name: string; content: string }): Promise<{ id: string; name: string }> {
+    return this.request("/api/skills/user", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateUserSkill(id: string, data: UserSkillInput): Promise<void> {
+    await this.request(`/api/skills/user/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteUserSkill(id: string): Promise<void> {
+    await this.request(`/api/skills/user/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  async toggleSkillAutoLoad(id: string, autoLoad: boolean): Promise<void> {
+    await this.request(`/api/skills/user/${encodeURIComponent(id)}/toggle-auto-load`, {
+      method: "POST",
+      body: JSON.stringify({ auto_load: autoLoad }),
+    });
+  }
+
+  /** Hot-reload built-in skills from disk (affects all users). */
+  async reloadCentralSkills(): Promise<{ status: string; central_skills_count: number }> {
+    return this.request("/api/skills/reload", { method: "POST" });
   }
 
   // ── Email Integration ──────────────────────────────────────────────

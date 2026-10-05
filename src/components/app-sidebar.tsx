@@ -24,8 +24,10 @@ import {
   Menu,
   FileText,
   PanelLeftClose,
+  Puzzle,
 } from "lucide-react";
 import { useChatStore } from "@/stores/chat-store";
+import { useGpuStatus } from "@/stores/gpu-store";
 import { DSLogo } from "@/components/ui/ds-logo";
 
 interface AppSidebarProps {
@@ -40,6 +42,7 @@ const NAV_ITEMS = [
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/reminders", label: "Reminders", icon: Zap },
   { href: "/artifacts", label: "Artifacts", icon: FileText },
+  { href: "/skills", label: "Skills", icon: Puzzle },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -314,6 +317,52 @@ function ChatSection({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ── GPU Status Indicator ───────────────────────────────────────────────
+// Reads the shared GPU poller (stores/gpu-store.ts) and shows a compact badge.
+// States: ai_ready (green), swapping_to_ai (yellow pulsing), nas_processing (blue), unknown (gray)
+
+const GPU_STATE_CONFIG: Record<string, { color: string; label: string; pulse?: boolean }> = {
+  ai_ready: { color: "bg-emerald-400", label: "AI Ready" },
+  swapping_to_ai: { color: "bg-amber-400", label: "Warming up…", pulse: true },
+  nas_processing: { color: "bg-sky-400", label: "NAS Processing" },
+  unknown: { color: "bg-white/30", label: "Unknown" },
+};
+
+function GpuStatusIndicator() {
+  const gpuState = useGpuStatus();
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  if (!gpuState) return null;
+
+  const config = GPU_STATE_CONFIG[gpuState.gpu_state] || GPU_STATE_CONFIG.unknown;
+
+  return (
+    <div
+      className="relative flex items-center gap-2 py-1"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${config.color} ${config.pulse ? "animate-pulse" : ""}`} />
+      <span className="text-white/25 text-[10px]">{config.label}</span>
+      {gpuState.active_sessions > 0 && (
+        <span className="text-[9px] text-white/15 ml-auto">
+          {gpuState.active_sessions} session{gpuState.active_sessions > 1 ? "s" : ""}
+        </span>
+      )}
+
+      {/* Tooltip */}
+      {showTooltip && (
+        <div className="absolute bottom-full left-0 mb-2 px-3 py-2 rounded-lg bg-[var(--color-bg-elevated)] border border-white/[0.1] shadow-xl text-[10px] text-white/50 whitespace-nowrap z-50">
+          <p className="font-medium text-white/70 mb-1">GPU Status</p>
+          <p>Model loaded: {gpuState.llama_loaded ? "✓ Yes" : "✗ No"}</p>
+          <p>Active sessions: {gpuState.active_sessions}</p>
+          <p>NAS processing: {gpuState.nas_processing ? "Yes" : "No"}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Server status indicator ────────────────────────────────────────────
 function ServerStatus() {
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
@@ -331,7 +380,11 @@ function ServerStatus() {
   if (!server) return null;
 
   return (
-    <div className="border-t border-white/[0.04] px-4 py-3 shrink-0">
+    <div className="border-t border-white/[0.04] px-4 py-3 shrink-0 space-y-1.5">
+      {/* GPU Status */}
+      <GpuStatusIndicator />
+
+      {/* Server connectivity */}
       <div className="flex items-center gap-2">
         <span className={`w-1.5 h-1.5 rounded-full ${isOnline === false ? "bg-red-400/60" : "bg-emerald-400/60"}`} />
         <span className="text-white/20 text-[10px] truncate">
