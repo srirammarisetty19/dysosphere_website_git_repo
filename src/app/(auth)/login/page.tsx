@@ -33,14 +33,8 @@ function LoginPageInner() {
   const [serverConnected, setServerConnected] = useState(false);
   const [checkingServer, setCheckingServer] = useState(false);
 
-  // On mount, check if a server URL is already configured (e.g. via gateway)
-  useEffect(() => {
-    const stored = apiClient.getServerUrl();
-    if (stored) {
-      setServerUrlInput(stored.replace(/^https?:\/\//, ""));
-      setServerConnected(true);
-    }
-  }, []);
+  // Always start at an empty server-address step — the user types the
+  // address of their SphereX and nothing connects until they press "Connect".
 
   // If user is already authenticated (e.g. via gateway), redirect to chat
   useEffect(() => {
