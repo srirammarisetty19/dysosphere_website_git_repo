@@ -36,6 +36,9 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { useChatStore } from "@/stores/chat-store";
+import { ActivityTimeline } from "@/components/chat/activity/activity-timeline";
+import { SourcesBar } from "@/components/chat/activity/sources";
+import { citedIdsOf, linkifyCitations } from "@/lib/citations";
 
 // ── Classify current session (NAS InPlace AI detection) ─────────────────
 function useNasContext(): { isNasInplace: boolean; filename: string | null } {
@@ -543,6 +546,18 @@ function AssistantBubble({
   const hasThinkingOrSteps =
     (thinkContent && thinkContent.length > 0) || steps.length > 0;
 
+  // ── Protocol v2: web activity + citations ──
+  const cancelRun = useChatStore((s) => s.cancelRun);
+  const items = message.items ?? [];
+  const sources = message.sources ?? [];
+  const validIds = new Set<number>(sources.map((s) => s.id));
+  for (const a of message.annotations ?? []) {
+    if (a.type === "url_citation" && typeof a.source_id === "number") validIds.add(a.source_id);
+  }
+  const renderedResponse = linkifyCitations(finalResponse, validIds);
+  const citedIds = citedIdsOf(finalResponse, validIds);
+  const showSources = !isStreaming && sources.length > 0 && !!finalResponse;
+
   return (
     <div className="group flex gap-3 py-6">
       {/* Avatar */}
@@ -556,7 +571,7 @@ function AssistantBubble({
         <span className="text-[13px] font-semibold text-white/70">Sphere AI</span>
 
         {/* Inline typing indicator — shows when streaming with no content yet */}
-        {isStreaming && !finalResponse && !hasThinkingOrSteps && (
+        {isStreaming && !finalResponse && !hasThinkingOrSteps && items.length === 0 && (
           <TypingIndicator />
         )}
 
@@ -573,12 +588,20 @@ function AssistantBubble({
           />
         )}
 
+        {/* Web activity: searches, page reads, live browser */}
+        {items.length > 0 && (
+          <ActivityTimeline items={items} isStreaming={isStreaming} onStop={() => void cancelRun()} />
+        )}
+
         {/* Final Response */}
         {finalResponse && (
           <div className="px-0.5">
-            <MarkdownRenderer content={finalResponse} />
+            <MarkdownRenderer content={renderedResponse} sources={sources} />
           </div>
         )}
+
+        {/* Sources used for this answer */}
+        {showSources && <SourcesBar sources={sources} citedIds={citedIds} />}
 
         {/* Inline Images (AuthImage for authenticated fetch) */}
         {image_urls && image_urls.length > 0 && (

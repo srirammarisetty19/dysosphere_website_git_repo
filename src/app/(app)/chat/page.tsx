@@ -9,6 +9,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useChatStore } from "@/stores/chat-store";
 import { apiClient } from "@/lib/api-client";
+import { isAutoScrollPaused } from "@/lib/scroll-pause";
 import { ChatMessages } from "@/components/chat/chat-messages";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ChatHeader } from "@/components/chat/chat-header";
@@ -67,8 +68,9 @@ export default function ChatPage() {
     prevLoadingRef.current = isLoading;
 
     if (isLoading) {
-      // During streaming — scroll on each message update
-      scrollToBottom();
+      // During streaming — scroll on each message update (unless the user is
+      // hovering an interactive card such as the live browser view)
+      if (!isAutoScrollPaused()) scrollToBottom();
     } else if (wasLoading && !isLoading) {
       // Streaming just finished — scroll to final position
       scrollToBottom();

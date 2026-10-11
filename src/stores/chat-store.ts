@@ -7,6 +7,13 @@
 import { create } from "zustand";
 import type { Message, MessagePart, Conversation, NasFileResult } from "@/lib/types";
 import { apiClient, ApiClientError } from "@/lib/api-client";
+import {
+  applyRunEvent,
+  emptyRunState,
+  runStateFromBlockMetadata,
+  runStateToMessage,
+  type RunState,
+} from "@/lib/run-items";
 
 interface ChatState {
   // Current conversation
@@ -447,6 +454,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     const accumulatedSteps: string[] = [];
     let accumulatedImageUrls: string[] = [];
     let accumulatedNasFiles: NasFileResult[] = [];
+    let runState: RunState = emptyRunState(); // Protocol v2 items/sources/citations
     let sessionId = conversationId;
     let title = get().currentTitle;
 
@@ -494,6 +502,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
           // ── Generation ID guard: drop writes from stale streams ──────
           if (_generationId !== myGeneration) break;
           hasReceivedData = true;
+
+          // Protocol v2 (typed items, citations) — shared reducer
+          const nextRun = applyRunEvent(runState, event);
+          if (nextRun) runState = nextRun;
 
           switch (event.type) {
             case "token":
@@ -616,6 +628,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
             steps: [...accumulatedSteps],
             image_urls: [...accumulatedImageUrls],
             nas_files: [...accumulatedNasFiles],
+            ...runStateToMessage(runState),
           };
 
           set({
@@ -696,6 +709,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
             steps: [...accumulatedSteps],
             image_urls: [...accumulatedImageUrls],
             nas_files: [...accumulatedNasFiles],
+            ...runStateToMessage(runState),
             thinking_duration_sec: hasThinking ? thinkingDuration : 0,
           },
         ],
@@ -830,6 +844,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           const accumulatedSteps: string[] = [];
           let accumulatedImageUrls: string[] = [];
           let accumulatedNasFiles: NasFileResult[] = [];
+          let runState: RunState = emptyRunState();
 
           try {
             const stream = apiClient.streamMessage("", conversationId, {
@@ -840,6 +855,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
               if (abortController.signal.aborted) break;
               // ── Generation ID guard ──────────────────────────────────
               if (_generationId !== myGeneration) break;
+
+              const nextRun = applyRunEvent(runState, event);
+              if (nextRun) runState = nextRun;
 
               switch (event.type) {
                 case "token":
@@ -881,6 +899,13 @@ export const useChatStore = create<ChatState>()((set, get) => {
                 case "tool_call":
                   accumulatedSteps.push(`🔧 ${event.tool || "Tool"}`);
                   break;
+                case "tool_result": {
+                  const hasErr =
+                    (event.content || "").includes("❌") ||
+                    (event.content || "").includes("failed");
+                  accumulatedSteps.push(hasErr ? "⚠️ Tool error" : "✅ Tool completed");
+                  break;
+                }
                 case "image":
                   if (event.image_urls) {
                     accumulatedImageUrls = [...accumulatedImageUrls, ...event.image_urls];
@@ -923,6 +948,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
                     steps: [...accumulatedSteps],
                     image_urls: [...accumulatedImageUrls],
                     nas_files: [...accumulatedNasFiles],
+                    ...runStateToMessage(runState),
                   },
                 ],
               });
@@ -969,7 +995,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
             const finalThinking = finalParsed.thinking || accumulatedThinking;
             const hasThinking = finalThinking.length > 0 || lastMsg?.steps?.length > 0;
 
-            if (accumulatedContent) {
+            if (accumulatedContent || runState.items.length > 0) {
               set({
                 messages: [
                   ...finalMessages.slice(0, -1),
@@ -980,6 +1006,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
                     steps: [...accumulatedSteps],
                     image_urls: [...accumulatedImageUrls],
                     nas_files: [...accumulatedNasFiles],
+                    ...runStateToMessage(runState),
                     thinking_duration_sec: hasThinking ? thinkingDuration : 0,
                   },
                 ],
@@ -1235,9 +1262,11 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
       let assistantContent = "";
       let foundAssistant = false;
       let turnImageUrls: string[] = [];
+      let turnRun: RunState = emptyRunState();
 
       while (i < blocks.length) {
         const b = blocks[i];
+        const bMeta = (b as Message & { metadata?: Record<string, unknown> | null }).metadata;
         if (b.role === "thinking") {
           // Accumulate thinking content and compute duration from actual content length
           thinkContent += (thinkContent ? "\n" : "") + b.content;
@@ -1258,6 +1287,7 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
           steps.push(`🔧 Running ${displayName}`);
           i++;
         } else if (b.role === "tool_result") {
+          turnRun = runStateFromBlockMetadata(turnRun, "tool_result", bMeta);
           const hasError = b.content.includes("❌") || b.content.includes("failed") || b.content.includes("Error");
           if (hasError) {
             steps.push("⚠️ Tool encountered an error");
@@ -1284,6 +1314,7 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
           if (b.image_urls && b.image_urls.length > 0) {
             turnImageUrls = [...turnImageUrls, ...b.image_urls];
           }
+          turnRun = runStateFromBlockMetadata(turnRun, "assistant", bMeta);
           foundAssistant = true;
           i++;
           break;
@@ -1311,6 +1342,7 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
           attachments: [],
           nas_files: [],
           parts: [],
+          ...runStateToMessage(turnRun),
         });
       }
       continue;

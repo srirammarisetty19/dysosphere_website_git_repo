@@ -70,6 +70,7 @@ const ROUTE_MAP: Record<string, string> = {
   webhooks: "webhooks",
   scheduler: "scheduler",
   skills: "skills",
+  browser: "browser",
 };
 
 class ApiClient {
@@ -814,6 +815,45 @@ class ApiClient {
       });
     } catch {
       // Non-critical — silent failure (run may have already completed)
+    }
+  }
+
+  // ── Browser live view (protocol v2) ─────────────────────────────────────
+  // The live view uses a dedicated binary WebSocket authenticated with a
+  // short-lived (60s), single-use ticket — the JWT never goes in that URL.
+
+  async createBrowserTicket(itemId: string, mode: "view" | "control" = "view"): Promise<{ ticket: string; expires_at: number; mode: string }> {
+    return this.request(`/api/browser/tickets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_id: itemId, mode }),
+    });
+  }
+
+  browserLiveUrl(itemId: string, ticket: string): string | null {
+    const server = this.getServerUrl();
+    const base = server
+      ? server.replace(/^http/, "ws")
+      : typeof window !== "undefined"
+        ? window.location.origin.replace(/^http/, "ws")
+        : null;
+    if (!base) return null;
+    return `${base}/api/ai/ws/browser/${encodeURIComponent(itemId)}?ticket=${encodeURIComponent(ticket)}`;
+  }
+
+  /** Fetch a step/final snapshot with auth and return an object URL (caller revokes). */
+  async fetchBrowserSnapshot(snapshotId: string, signal?: AbortSignal): Promise<string | null> {
+    const token = this.getToken();
+    const url = this.resolveUrl(`/api/browser/snapshots/${encodeURIComponent(snapshotId)}`);
+    try {
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal,
+      });
+      if (!res.ok) return null;
+      return URL.createObjectURL(await res.blob());
+    } catch {
+      return null;
     }
   }
 

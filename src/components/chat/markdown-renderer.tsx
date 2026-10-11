@@ -5,12 +5,15 @@
 // Clean typography, breathable spacing, polished code blocks
 // ============================================================================
 
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import { useState, type ComponentPropsWithoutRef } from "react";
+import { useMemo, useState, type ComponentPropsWithoutRef } from "react";
 import { Check, Copy } from "lucide-react";
 import { AuthImage } from "@/components/ui/auth-image";
+import { CitationPill } from "@/components/chat/activity/sources";
+import { CITE_SCHEME } from "@/lib/citations";
+import type { Source } from "@/lib/types";
 
 // Import highlight.js atom-one-dark theme
 import "highlight.js/styles/atom-one-dark.css";
@@ -18,9 +21,20 @@ import "highlight.js/styles/atom-one-dark.css";
 interface MarkdownRendererProps {
   content: string;
   dimmed?: boolean;
+  /** Web sources for this answer — enables [n] citation pills. */
+  sources?: Source[];
 }
 
-export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererProps) {
+// Keep our internal cite: scheme; everything else goes through the safe default.
+const urlTransform = (url: string) => (url.startsWith(CITE_SCHEME) ? url : defaultUrlTransform(url));
+
+const normUrl = (u: string) => u.replace(/#.*$/, "").replace(/\/$/, "");
+
+export function MarkdownRenderer({ content, dimmed = false, sources }: MarkdownRendererProps) {
+  const sourceById = useMemo(() => new Map((sources ?? []).map((s) => [s.id, s])), [sources]);
+  const sourceUrls = useMemo(() => new Set((sources ?? []).map((s) => normUrl(s.url))), [sources]);
+  const hasSources = (sources?.length ?? 0) > 0;
+
   return (
     <div
       className={`gemini-prose max-w-none ${
@@ -30,6 +44,7 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
+        urlTransform={urlTransform}
         components={{
           // ── Headings ─────────────────────────────────────────────
           h1: ({ children, ...props }) => (
@@ -185,17 +200,33 @@ export function MarkdownRenderer({ content, dimmed = false }: MarkdownRendererPr
           ),
 
           // ── Links ────────────────────────────────────────────────
-          a: ({ children, href, ...props }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[var(--color-accent-blue)] underline decoration-[var(--color-accent-blue)]/30 hover:decoration-[var(--color-accent-blue)] underline-offset-2 transition-all"
-              {...props}
-            >
-              {children}
-            </a>
-          ),
+          a: ({ children, href, ...props }) => {
+            // [n] citation → pill with hover card
+            if (href && href.startsWith(CITE_SCHEME)) {
+              const n = parseInt(href.slice(CITE_SCHEME.length), 10);
+              return <CitationPill n={n} source={sourceById.get(n)} />;
+            }
+            // When the answer is web-grounded, flag links that don't match
+            // any page the assistant actually opened (possible hallucination).
+            const unverified =
+              hasSources && !!href && /^https?:/i.test(href) && !sourceUrls.has(normUrl(href));
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={unverified ? "This link isn't one of the sources the assistant opened" : undefined}
+                className={
+                  unverified
+                    ? "text-[var(--color-accent-blue)]/80 underline decoration-dotted decoration-amber-300/50 hover:decoration-amber-300 underline-offset-2 transition-all"
+                    : "text-[var(--color-accent-blue)] underline decoration-[var(--color-accent-blue)]/30 hover:decoration-[var(--color-accent-blue)] underline-offset-2 transition-all"
+                }
+                {...props}
+              >
+                {children}
+              </a>
+            );
+          },
 
           // ── Images (AuthImage for authenticated fetch) ────────────
           img: ({ src, alt }) => {

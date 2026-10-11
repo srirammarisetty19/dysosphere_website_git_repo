@@ -87,6 +87,86 @@ export interface Message {
   parts: MessagePart[]; // Multimodal content parts
   stream_started_at?: string;
   name?: string;
+  /** Protocol v2: web activity items (search / page read / browser task) in order */
+  items?: RunItem[];
+  /** Protocol v2: sources registered during the run (citation ids are 1-based) */
+  sources?: Source[];
+  /** Protocol v2: server-validated citations for this answer */
+  annotations?: Annotation[];
+}
+
+// ── Protocol v2: typed run items, sources, citations ────────────────────────
+// Mirrors server core/items.py. Every item.* event carries the full snapshot.
+
+export type RunItemKind = "web_search" | "page_read" | "browser_task";
+export type RunItemStatus = "queued" | "in_progress" | "completed" | "failed" | "cancelled";
+export type RunErrorCode =
+  | "TIMEOUT" | "BLOCKED_BY_SITE" | "POLICY_DENIED" | "NEEDS_LOGIN" | "SANDBOX_UNAVAILABLE"
+  | "NOT_CONFIGURED" | "PROVIDER_UNAVAILABLE" | "FETCH_FAILED" | "STEP_LIMIT" | "CANCELLED"
+  | "INVALID_ARGS" | "INTERNAL";
+
+export interface Source {
+  id: number;
+  url: string;
+  title: string;
+  snippet?: string;
+  domain?: string;
+  favicon?: string;
+  item_id?: string | null;
+}
+
+export interface BrowserAction {
+  type: string;
+  label: string;
+  element_index?: number | null;
+}
+
+export interface RunItemData {
+  // browser_task
+  phase?: "queued" | "launching" | "navigating" | "acting" | "waiting_for_user" | "blocked_retrying";
+  step?: number;
+  max_steps?: number;
+  url?: string;
+  title?: string;
+  goal?: string;
+  actions?: BrowserAction[];
+  snapshot_id?: string | null;
+  final_snapshot_id?: string | null;
+  final_url?: string;
+  queue_position?: number | null;
+  live?: boolean;
+  sandboxed?: boolean;
+  provider?: string;
+  steps_taken?: number;
+  success?: boolean;
+  visited?: { url: string; title?: string }[];
+  [key: string]: unknown;
+}
+
+export interface RunItem {
+  id: string;
+  run_id?: string;
+  kind: RunItemKind;
+  status: RunItemStatus;
+  call_id?: string;
+  tool?: string;
+  args: Record<string, unknown>;
+  data: RunItemData;
+  sources: Source[];
+  error_code?: RunErrorCode | string | null;
+  error?: string | null;
+  result_summary?: string | null;
+  started_at?: number;
+  ended_at?: number | null;
+}
+
+export interface Annotation {
+  type: "url_citation" | "unverified_link";
+  source_id?: number;
+  url: string;
+  title?: string;
+  start: number;
+  end: number;
 }
 
 export interface NasFileResult {
@@ -115,7 +195,17 @@ export type StreamEventType =
   | "iteration_summary"
   | "plan_update"
   | "resume_status"    // Registry resume/replay indicator
-  | "truncation_warning"; // Input was truncated (Google/OpenAI typed event)
+  | "truncation_warning" // Input was truncated (Google/OpenAI typed event)
+  // Protocol v2
+  | "item.created"
+  | "item.updated"
+  | "item.completed"
+  | "item.failed"
+  | "item.cancelled"
+  | "message.annotations"
+  | "approval.requested"
+  | "takeover.requested"
+  | "takeover.ended";
 
 export interface StreamEvent {
   type: StreamEventType;
@@ -129,6 +219,12 @@ export interface StreamEvent {
   title?: string;
   is_truncated?: boolean;
   timestamp?: string;
+  // Protocol v2 envelope
+  v?: number;
+  seq?: number;
+  run_id?: string;
+  item?: RunItem;
+  data?: { annotations?: Annotation[]; sources?: Source[] } & Record<string, unknown>;
 }
 
 // ── Sessions ────────────────────────────────────────────────────────────
