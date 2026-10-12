@@ -1236,8 +1236,10 @@
     & .mk-grid-2, & .mk-grid-4, & .mk-security-list, & .mk-form-row { grid-template-columns: 1fr; }
     & .mk-platform { grid-template-columns: 1fr; }
     & .mk-actions .mk-btn { flex: 1 1 100%; }
-    & .mk-hero-chat { left: 0; width: 78%; bottom: -10%; }
-    & .mk-hero-badge { right: 0; }
+    & .mk-hero-visual { aspect-ratio: auto; display: flex; flex-direction: column; margin-bottom: 0; }
+    & .mk-hero-device { position: relative; inset: auto; aspect-ratio: 1 / 1; }
+    & .mk-hero-chat { position: relative; left: auto; bottom: auto; width: 100%; margin-top: -14%; animation: none; }
+    & .mk-hero-badge { right: 0; top: 10vw; }
     & .mk-compare th, & .mk-compare td { padding: 14px; font-size: 0.88rem; }
     & .mk-compare td:first-child { width: auto; }
     & .mk-diagram-row { grid-template-columns: 1fr; }
