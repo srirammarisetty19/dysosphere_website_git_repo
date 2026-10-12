@@ -88,7 +88,7 @@ const INDUSTRY_TILES = [
 const FAQ: FaqItem[] = [
   {
     q: "What exactly is SphereX?",
-    a: "SphereX is a physical device that sits in your office. It combines a private AI server (it runs large language models locally) with secure, expandable storage for your company's files. Your team uses it through simple web and mobile apps — like ChatGPT and Google Drive, but running on hardware you own.",
+    a: "SphereX is a physical device that sits in your office. It combines a private AI server (it runs large language models locally) with secure, expandable storage for your company's files. Your team uses it through simple web and mobile apps — like ChatGPT and Google Drive, but running on AI you own.",
   },
   {
     q: "How is it different from a regular NAS or file server?",

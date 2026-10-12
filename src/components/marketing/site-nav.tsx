@@ -29,6 +29,9 @@ const SIGN_IN_OPTIONS = [
 function rememberService(service: string) {
   try {
     localStorage.setItem("spherex_service", service);
+    // The website and the SphereX API share one origin, so /login can go
+    // straight to username + password (same as the legacy gateway).
+    localStorage.setItem("spherex_server", window.location.origin);
   } catch {
     /* storage unavailable — non-critical */
   }

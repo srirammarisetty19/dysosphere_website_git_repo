@@ -417,6 +417,7 @@
     max-width: 560px;
     width: 100%;
     margin-inline: auto;
+    margin-bottom: 72px;
   }
   & .mk-hero-device {
     position: absolute;
@@ -429,9 +430,9 @@
   }
   & .mk-hero-chat {
     position: absolute;
-    left: -6%;
-    bottom: 8%;
-    width: min(330px, 70%);
+    left: -10%;
+    bottom: -12%;
+    width: min(310px, 64%);
     padding: 14px;
     border-radius: 16px;
     background: rgba(16, 20, 28, 0.96);
@@ -1235,7 +1236,7 @@
     & .mk-grid-2, & .mk-grid-4, & .mk-security-list, & .mk-form-row { grid-template-columns: 1fr; }
     & .mk-platform { grid-template-columns: 1fr; }
     & .mk-actions .mk-btn { flex: 1 1 100%; }
-    & .mk-hero-chat { left: 0; width: 78%; }
+    & .mk-hero-chat { left: 0; width: 78%; bottom: -10%; }
     & .mk-hero-badge { right: 0; }
     & .mk-compare th, & .mk-compare td { padding: 14px; font-size: 0.88rem; }
     & .mk-compare td:first-child { width: auto; }
