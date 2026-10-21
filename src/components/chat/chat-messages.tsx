@@ -39,6 +39,9 @@ import { useChatStore } from "@/stores/chat-store";
 import { ActivityTimeline } from "@/components/chat/activity/activity-timeline";
 import { SourcesBar } from "@/components/chat/activity/sources";
 import { citedIdsOf, linkifyCitations } from "@/lib/citations";
+import { ImageJobCard } from "@/components/image-edit/image-job-card";
+import { GpuBusyBanner } from "@/components/image-edit/gpu-busy-banner";
+import { EditWithAiButton } from "@/components/image-edit/edit-with-ai-button";
 
 // ── Classify current session (NAS InPlace AI detection) ─────────────────
 function useNasContext(): { isNasInplace: boolean; filename: string | null } {
@@ -452,6 +455,7 @@ function UserBubble({
                   className="max-w-[200px] max-h-[200px] object-cover rounded-xl"
                   clickToOpen
                 />
+                <EditWithAiButton url={part.file_url!} name={part.filename} />
               </div>
             ))}
           </div>
@@ -470,6 +474,7 @@ function UserBubble({
                   className="max-w-[200px] max-h-[200px] object-cover rounded-xl"
                   clickToOpen
                 />
+                <EditWithAiButton url={url} />
               </div>
             ))}
           </div>
@@ -557,6 +562,9 @@ function AssistantBubble({
   const renderedResponse = linkifyCitations(finalResponse, validIds);
   const citedIds = citedIdsOf(finalResponse, validIds);
   const showSources = !isStreaming && sources.length > 0 && !!finalResponse;
+  const imageJobIds = message.image_job_ids ?? [];
+  // Reply is queued behind an AI image edit (server `gpu_wait` event)
+  const gpuWaiting = useChatStore((s) => s.gpuWait != null) && isStreaming;
 
   return (
     <div className="group flex gap-3 py-6">
@@ -570,8 +578,15 @@ function AssistantBubble({
         {/* Sender label */}
         <span className="text-[13px] font-semibold text-white/70">Sphere AI</span>
 
+        {/* GPU busy with an image edit — "chat resumes in ~X s" */}
+        {gpuWaiting && (
+          <div>
+            <GpuBusyBanner variant="inline" onlyWhenWaiting />
+          </div>
+        )}
+
         {/* Inline typing indicator — shows when streaming with no content yet */}
-        {isStreaming && !finalResponse && !hasThinkingOrSteps && items.length === 0 && (
+        {isStreaming && !gpuWaiting && !finalResponse && !hasThinkingOrSteps && items.length === 0 && imageJobIds.length === 0 && (
           <TypingIndicator />
         )}
 
@@ -603,6 +618,15 @@ function AssistantBubble({
         {/* Sources used for this answer */}
         {showSources && <SourcesBar sources={sources} citedIds={citedIds} />}
 
+        {/* AI image edits (edit_image tool) — live progress → before/after */}
+        {imageJobIds.length > 0 && (
+          <div className="flex flex-col gap-3 mt-3">
+            {imageJobIds.map((id) => (
+              <ImageJobCard key={id} jobId={id} />
+            ))}
+          </div>
+        )}
+
         {/* Inline Images (AuthImage for authenticated fetch) */}
         {image_urls && image_urls.length > 0 && (
           <div className="flex flex-wrap gap-3 mt-3">
@@ -617,6 +641,7 @@ function AssistantBubble({
                   className="max-w-[320px] max-h-[240px] object-cover"
                   clickToOpen
                 />
+                <EditWithAiButton url={url} />
                 {/* Hover overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end justify-end p-2 pointer-events-none">
                   <span className="flex items-center gap-1 text-[10px] text-white/80 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-lg">

@@ -33,6 +33,8 @@ import type {
   CentralSkill,
   UserSkill,
   UserSkillInput,
+  ImageJob,
+  ImageEditRequest,
 } from "./types";
 
 class ApiClientError extends Error {
@@ -749,6 +751,7 @@ class ApiClient {
         const imageUrls = parts.length > 0
           ? parts.filter((p) => p.type === "image" && p.file_url).map((p) => p.file_url!)
           : m.images || [];
+        const imageJobId = m.metadata?.image_job_id;
         return {
           role: m.role as Message["role"],
           content: m.content || "",
@@ -761,6 +764,8 @@ class ApiClient {
           nas_files: [],
           parts: parts,
           name: m.name || undefined,
+          // AI image edit created by this tool call (restored as a job card)
+          ...(typeof imageJobId === "string" && imageJobId ? { image_job_ids: [imageJobId] } : {}),
         };
       }),
     };
@@ -1049,6 +1054,93 @@ class ApiClient {
 
   async getGpuStatus(): Promise<GpuStatus> {
     return this.request("/api/gpu/status");
+  }
+
+  // ── AI Image Editing ─────────────────────────────────────────────────
+  // Server: /image-edits/* (async jobs — submit returns 202 + job snapshot,
+  // then poll GET /image-edits/{id} until completed/failed/cancelled).
+
+  /**
+   * Submit an image edit. `idempotencyKey` makes double-clicks / retries
+   * return the same job instead of queueing a duplicate (Stripe pattern).
+   */
+  async submitImageEdit(req: ImageEditRequest, idempotencyKey?: string): Promise<ImageJob> {
+    const form = new FormData();
+    if (req.image) {
+      const type = req.image.type || "image/png";
+      const ext = type.includes("jpeg") ? "jpg" : type.split("/")[1] || "png";
+      form.append("image", req.image, `image.${ext}`);
+    }
+    if (req.parentJobId) form.append("parent_job_id", req.parentJobId);
+    if (req.mask) form.append("mask", req.mask, "mask.png");
+    form.append("instruction", req.instruction ?? "");
+    form.append("operation", req.operation ?? "auto");
+    form.append("mode", req.mode ?? "standard");
+    if (req.sessionId) form.append("session_id", req.sessionId);
+    if (req.seed != null) form.append("seed", String(req.seed));
+    if (req.upscaleFactor) form.append("upscale_factor", String(req.upscaleFactor));
+
+    const data = await this.request<{ job: ImageJob }>("/api/image-edits", {
+      method: "POST",
+      body: form,
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+    });
+    return data.job;
+  }
+
+  async getImageJob(jobId: string): Promise<ImageJob> {
+    const data = await this.request<{ job: ImageJob }>(`/api/image-edits/${encodeURIComponent(jobId)}`);
+    return data.job;
+  }
+
+  async listImageJobs(sessionId?: string, limit = 30): Promise<ImageJob[]> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (sessionId) params.set("session_id", sessionId);
+    const data = await this.request<{ jobs: ImageJob[] }>(`/api/image-edits?${params}`);
+    return data.jobs ?? [];
+  }
+
+  async cancelImageJob(jobId: string): Promise<ImageJob> {
+    const data = await this.request<{ job: ImageJob }>(`/api/image-edits/${encodeURIComponent(jobId)}`, {
+      method: "DELETE",
+    });
+    return data.job;
+  }
+
+  /** Same input, mask and prompt with a new seed (a new "version"). */
+  async regenerateImageJob(jobId: string, mode?: string): Promise<ImageJob> {
+    const form = new FormData();
+    if (mode) form.append("mode", mode);
+    const data = await this.request<{ job: ImageJob }>(
+      `/api/image-edits/${encodeURIComponent(jobId)}/regenerate`,
+      { method: "POST", body: form }
+    );
+    return data.job;
+  }
+
+  async saveImageJobToNas(jobId: string): Promise<{ file_id: string; filename?: string; already_saved?: boolean }> {
+    return this.request(`/api/image-edits/${encodeURIComponent(jobId)}/save`, { method: "POST" });
+  }
+
+  /** Fetch a job image (needs auth) and return the raw Blob. */
+  async fetchImageJobBlob(
+    jobId: string,
+    kind: "result" | "input" | "mask" | "thumb" = "result",
+    version?: string | number
+  ): Promise<Blob> {
+    const qs = new URLSearchParams({ kind });
+    if (version != null) qs.set("v", String(version));
+    const url = this.resolveUrl(`/api/image-edits/${encodeURIComponent(jobId)}/image?${qs}`);
+    const doFetch = () => {
+      const token = this.getToken();
+      return fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    };
+    let resp = await doFetch();
+    if (resp.status === 401 && (await this.tryRefreshToken())) {
+      resp = await doFetch();
+    }
+    if (!resp.ok) throw new ApiClientError(`Failed to load image (${resp.status})`, resp.status);
+    return resp.blob();
   }
 
   // ── Notifications ───────────────────────────────────────────────────

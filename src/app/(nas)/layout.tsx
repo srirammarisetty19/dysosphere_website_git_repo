@@ -10,6 +10,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { nasApiClient } from "@/lib/nas-api-client";
 import { NasSidebar } from "@/components/nas/nas-sidebar";
+import { ImageEditorHost } from "@/components/image-edit/image-editor-host";
 import { Loader2, WifiOff, RefreshCw, PanelLeftClose, Menu, LogOut, Settings, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
@@ -187,6 +188,8 @@ function NasLayoutInner({ children }: { children: React.ReactNode }) {
           <NasHeaderAccountMenu />
         </div>
         <main className="flex-1 overflow-y-auto">{children}</main>
+        {/* Full-screen AI image editor (opened from the file viewer) */}
+        <ImageEditorHost />
       </div>
 
       {/* Mobile sidebar overlay */}

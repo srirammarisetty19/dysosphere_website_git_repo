@@ -6,15 +6,25 @@
 // - Ref-counted: polling runs only while at least one component is subscribed
 // - Pauses while the tab is hidden, refreshes immediately when it returns
 // - Polls faster while the model is warming up so the banner clears promptly
+// - Polls every 3 s while an AI image edit owns the GPU (chat ETA banner)
 // ============================================================================
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { apiClient } from "@/lib/api-client";
 import type { GpuStatus } from "@/lib/types";
 
 const NORMAL_INTERVAL_MS = 15_000;
 const WARMING_INTERVAL_MS = 4_000;
+const IMAGE_BUSY_INTERVAL_MS = 3_000;
+
+const IMAGE_GPU_STATES = new Set(["draining_for_image", "swapping_to_image", "image_ready"]);
+
+/** True while AI image editing owns the GPU (chat replies wait). */
+export function isImageBusy(status: GpuStatus | null | undefined): boolean {
+  if (!status) return false;
+  return !!status.image_busy || IMAGE_GPU_STATES.has(String(status.gpu_state));
+}
 
 interface GpuStoreState {
   status: GpuStatus | null; // null = unknown / endpoint unavailable
@@ -34,11 +44,17 @@ export const useGpuStore = create<GpuStoreState>()((set, get) => {
     if (timer) clearTimeout(timer);
     if (subscribers === 0) return;
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-    const warming = get().status?.gpu_state === "swapping_to_ai";
+    const status = get().status;
+    const warming = status?.gpu_state === "swapping_to_ai";
+    const delay = isImageBusy(status)
+      ? IMAGE_BUSY_INTERVAL_MS
+      : warming
+        ? WARMING_INTERVAL_MS
+        : NORMAL_INTERVAL_MS;
     timer = setTimeout(async () => {
       await get().refresh();
       schedule();
-    }, warming ? WARMING_INTERVAL_MS : NORMAL_INTERVAL_MS);
+    }, delay);
   };
 
   return {
@@ -96,4 +112,27 @@ export function useGpuStatus(): GpuStatus | null {
   const subscribe = useGpuStore((s) => s.subscribe);
   useEffect(() => subscribe(), [subscribe]);
   return status;
+}
+
+/** True only when the server reports AI image editing is enabled (hidden on older servers). */
+export function useImageEditEnabled(): boolean {
+  const status = useGpuStatus();
+  return status?.image_edit_enabled === true;
+}
+
+/**
+ * Smooth 1 s countdown from a server ETA. Returns null when there is no ETA.
+ * `receivedAt` should change whenever a fresh ETA arrives.
+ */
+export function useEtaCountdown(etaSeconds: number | null | undefined, receivedAt: number | null): number | null {
+  const [now, setNow] = useState(() => Date.now());
+  const active = etaSeconds != null && receivedAt != null;
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [active]);
+  if (!active) return null;
+  const elapsed = Math.max(0, (now - receivedAt!) / 1000);
+  return Math.max(0, Math.round(etaSeconds! - elapsed));
 }

@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { create } from "zustand";
-import type { Message, MessagePart, Conversation, NasFileResult } from "@/lib/types";
+import type { Message, MessagePart, Conversation, NasFileResult, ImageJob, StreamEvent } from "@/lib/types";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import {
   applyRunEvent,
@@ -14,6 +14,35 @@ import {
   runStateToMessage,
   type RunState,
 } from "@/lib/run-items";
+import { useImageJobStore } from "@/stores/image-job-store";
+
+/** Chat reply is queued behind an AI image edit (server `gpu_wait` event). */
+export interface GpuWaitState {
+  message: string;
+  etaSeconds: number | null;
+  /** Date.now() when the ETA was received (for a local countdown) */
+  receivedAt: number;
+}
+
+function gpuWaitFromEvent(event: StreamEvent): GpuWaitState {
+  const eta = Number(event.data?.eta_seconds);
+  return {
+    message:
+      event.content ||
+      (typeof event.data?.message === "string" ? event.data.message : "") ||
+      "🎨 AI is busy creating an image",
+    etaSeconds: Number.isFinite(eta) ? eta : null,
+    receivedAt: Date.now(),
+  };
+}
+
+/** Returns the new id list when `event` is an `image_job` event (and caches the snapshot). */
+function imageJobIdsFromEvent(event: StreamEvent, ids: string[]): string[] {
+  const job = event.data as unknown as ImageJob | undefined;
+  if (!job || typeof job.job_id !== "string" || !job.job_id) return ids;
+  useImageJobStore.getState().upsert(job);
+  return ids.includes(job.job_id) ? ids : [...ids, job.job_id];
+}
 
 interface ChatState {
   // Current conversation
@@ -30,6 +59,7 @@ interface ChatState {
   iterationSummaries: string[];
   errorMessage: string | null;
   truncationWarning: string | null;  // Shown when input was truncated (Google/OpenAI typed event)
+  gpuWait: GpuWaitState | null;      // Reply waiting for an AI image edit to release the GPU
 
   // Upload progress (null when not uploading)
   uploadProgress: { current: number; total: number; filename: string } | null;
@@ -280,6 +310,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
   iterationSummaries: [],
   errorMessage: null,
   truncationWarning: null,
+  gpuWait: null,
   uploadProgress: null,
   conversations: [],
   isLoadingHistory: false,
@@ -356,6 +387,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       iterationSummaries: [],
       errorMessage: null,
       truncationWarning: null,
+      gpuWait: null,
     });
 
     // ── Mint generation ID for this request ────────────────────────────
@@ -454,6 +486,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     const accumulatedSteps: string[] = [];
     let accumulatedImageUrls: string[] = [];
     let accumulatedNasFiles: NasFileResult[] = [];
+    let accumulatedImageJobIds: string[] = []; // AI image edits (edit_image tool)
     let runState: RunState = emptyRunState(); // Protocol v2 items/sources/citations
     let sessionId = conversationId;
     let title = get().currentTitle;
@@ -507,7 +540,18 @@ export const useChatStore = create<ChatState>()((set, get) => {
           const nextRun = applyRunEvent(runState, event);
           if (nextRun) runState = nextRun;
 
+          // Any real output means the GPU wait is over
+          if (event.type !== "gpu_wait" && get().gpuWait) set({ gpuWait: null });
+
           switch (event.type) {
+            case "gpu_wait":
+              set({ gpuWait: gpuWaitFromEvent(event) });
+              break;
+
+            case "image_job":
+              accumulatedImageJobIds = imageJobIdsFromEvent(event, accumulatedImageJobIds);
+              break;
+
             case "token":
               accumulatedContent += event.content || "";
               break;
@@ -547,6 +591,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
                   accumulatedSteps.length = 0;
                   accumulatedImageUrls = [];
                   accumulatedNasFiles = [];
+                  accumulatedImageJobIds = [];
                   set({ isResuming: true, currentActivity: statusContent });
                 }
               }
@@ -628,6 +673,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
             steps: [...accumulatedSteps],
             image_urls: [...accumulatedImageUrls],
             nas_files: [...accumulatedNasFiles],
+            image_job_ids: [...accumulatedImageJobIds],
             ...runStateToMessage(runState),
           };
 
@@ -709,6 +755,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
             steps: [...accumulatedSteps],
             image_urls: [...accumulatedImageUrls],
             nas_files: [...accumulatedNasFiles],
+            image_job_ids: [...accumulatedImageJobIds],
             ...runStateToMessage(runState),
             thinking_duration_sec: hasThinking ? thinkingDuration : 0,
           },
@@ -716,6 +763,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         isLoading: false,
         isResuming: false,
         currentActivity: null,
+        gpuWait: null,
         uploadProgress: null,
         abortController: null,
       });
@@ -734,7 +782,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       if (conversationId) {
         apiClient.cancelAgentRun(conversationId).catch(() => {});
       }
-      set({ isLoading: false, isResuming: false, abortController: null });
+      set({ isLoading: false, isResuming: false, abortController: null, gpuWait: null });
     }
   },
 
@@ -844,6 +892,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           const accumulatedSteps: string[] = [];
           let accumulatedImageUrls: string[] = [];
           let accumulatedNasFiles: NasFileResult[] = [];
+          let accumulatedImageJobIds: string[] = [];
           let runState: RunState = emptyRunState();
 
           try {
@@ -859,7 +908,15 @@ export const useChatStore = create<ChatState>()((set, get) => {
               const nextRun = applyRunEvent(runState, event);
               if (nextRun) runState = nextRun;
 
+              if (event.type !== "gpu_wait" && get().gpuWait) set({ gpuWait: null });
+
               switch (event.type) {
+                case "gpu_wait":
+                  set({ gpuWait: gpuWaitFromEvent(event) });
+                  break;
+                case "image_job":
+                  accumulatedImageJobIds = imageJobIdsFromEvent(event, accumulatedImageJobIds);
+                  break;
                 case "token":
                   accumulatedContent += event.content || "";
                   break;
@@ -884,6 +941,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
                     accumulatedSteps.length = 0;
                     accumulatedImageUrls = [];
                     accumulatedNasFiles = [];
+                    accumulatedImageJobIds = [];
                     set({ isResuming: true, currentActivity: statusContent });
                   }
                   break;
@@ -948,6 +1006,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
                     steps: [...accumulatedSteps],
                     image_urls: [...accumulatedImageUrls],
                     nas_files: [...accumulatedNasFiles],
+                    image_job_ids: [...accumulatedImageJobIds],
                     ...runStateToMessage(runState),
                   },
                 ],
@@ -995,7 +1054,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
             const finalThinking = finalParsed.thinking || accumulatedThinking;
             const hasThinking = finalThinking.length > 0 || lastMsg?.steps?.length > 0;
 
-            if (accumulatedContent || runState.items.length > 0) {
+            if (accumulatedContent || runState.items.length > 0 || accumulatedImageJobIds.length > 0) {
               set({
                 messages: [
                   ...finalMessages.slice(0, -1),
@@ -1006,6 +1065,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
                     steps: [...accumulatedSteps],
                     image_urls: [...accumulatedImageUrls],
                     nas_files: [...accumulatedNasFiles],
+                    image_job_ids: [...accumulatedImageJobIds],
                     ...runStateToMessage(runState),
                     thinking_duration_sec: hasThinking ? thinkingDuration : 0,
                   },
@@ -1017,6 +1077,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
               isLoading: false,
               isResuming: false,
               currentActivity: null,
+              gpuWait: null,
               abortController: null,
               iterationSummaries: [],
             });
@@ -1050,6 +1111,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       currentActivity: null,
       iterationSummaries: [],
       errorMessage: null,
+      gpuWait: null,
       abortController: null,
     });
   },
@@ -1262,11 +1324,18 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
       let assistantContent = "";
       let foundAssistant = false;
       let turnImageUrls: string[] = [];
+      let turnImageJobIds: string[] = [];
       let turnRun: RunState = emptyRunState();
 
       while (i < blocks.length) {
         const b = blocks[i];
         const bMeta = (b as Message & { metadata?: Record<string, unknown> | null }).metadata;
+        // AI image edits are attached to the edit_image tool_result block
+        if (b.image_job_ids && b.image_job_ids.length > 0) {
+          for (const id of b.image_job_ids) {
+            if (!turnImageJobIds.includes(id)) turnImageJobIds = [...turnImageJobIds, id];
+          }
+        }
         if (b.role === "thinking") {
           // Accumulate thinking content and compute duration from actual content length
           thinkContent += (thinkContent ? "\n" : "") + b.content;
@@ -1330,7 +1399,7 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
         assistantContent = ""; // Thinking-only turn, no visible content
       }
 
-      if (assistantContent || thinkContent || steps.length > 0) {
+      if (assistantContent || thinkContent || steps.length > 0 || turnImageJobIds.length > 0) {
         result.push({
           role: "assistant",
           content: assistantContent.trim(),
@@ -1342,6 +1411,7 @@ function groupBlocksIntoTurns(blocks: Message[]): Message[] {
           attachments: [],
           nas_files: [],
           parts: [],
+          ...(turnImageJobIds.length > 0 ? { image_job_ids: turnImageJobIds } : {}),
           ...runStateToMessage(turnRun),
         });
       }

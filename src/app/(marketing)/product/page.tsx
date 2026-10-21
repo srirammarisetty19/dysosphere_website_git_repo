@@ -22,6 +22,7 @@ import {
   Search,
   Smartphone,
   Sparkles,
+  Wand2,
 } from "lucide-react";
 import { CtaBand, QuoteButton, SectionHead } from "@/components/marketing/blocks";
 
@@ -75,6 +76,23 @@ const AI_FEATURES: Feature[] = [
     example: {
       q: "What's the notice period in our office lease?",
       a: "90 days' written notice before the renewal date. Source: Office-Lease-2024.pdf, page 6.",
+    },
+  },
+  {
+    id: "image-edit",
+    Icon: Wand2,
+    label: "AI image editing",
+    title: "Edit photos with words — privately",
+    body: "Describe the change and SphereX makes it. Image editing runs on open-source models on the device's own GPU, so product shots, patient photos and client images never touch a cloud service.",
+    points: [
+      "One-click background removal and enhancement",
+      "Brush over an object to erase or replace it",
+      "Restyle images or edit them with a plain-English prompt",
+      "Results save straight back to your files, with version history",
+    ],
+    example: {
+      q: "Remove the background from product-shot.jpg",
+      a: "Done — a transparent PNG is ready. Want me to save it to /Marketing/Product Shots?",
     },
   },
   {

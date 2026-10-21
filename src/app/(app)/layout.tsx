@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { apiClient } from "@/lib/api-client";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ImageEditorHost } from "@/components/image-edit/image-editor-host";
 import { Loader2, WifiOff, RefreshCw, PanelLeftClose } from "lucide-react";
 
 function AppLayoutInner({ children }: { children: React.ReactNode }) {
@@ -193,6 +194,8 @@ function AppLayoutInner({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      {/* Full-screen AI image editor (opened from chat, cards, sidebar) */}
+      <ImageEditorHost />
     </div>
   );
 }

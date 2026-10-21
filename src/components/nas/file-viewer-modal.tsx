@@ -18,7 +18,10 @@ import {
   Loader2,
   FileText,
   Sparkles,
+  Wand2,
 } from "lucide-react";
+import { useImageEditEnabled } from "@/stores/gpu-store";
+import { useImageEditorStore } from "@/stores/image-editor-store";
 
 interface FileViewerModalProps {
   item: DisplayItem;
@@ -30,6 +33,8 @@ export function FileViewerModal({ item, onClose, onAskAI }: FileViewerModalProps
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const imageEditEnabled = useImageEditEnabled();
+  const openImageEditor = useImageEditorStore((s) => s.open);
 
   if (item.kind !== "file") return null;
 
@@ -89,7 +94,7 @@ export function FileViewerModal({ item, onClose, onAskAI }: FileViewerModalProps
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !useImageEditorStore.getState().isOpen) onClose();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
@@ -133,6 +138,26 @@ export function FileViewerModal({ item, onClose, onAskAI }: FileViewerModalProps
         </div>
 
         <div className="flex items-center gap-1">
+          {isImage && imageEditEnabled && (
+            <button
+              id="nas-viewer-edit-with-ai"
+              onClick={async () => {
+                try {
+                  const blob = blobUrl
+                    ? await (await fetch(blobUrl)).blob()
+                    : await nasApiClient.downloadFile(file.id);
+                  openImageEditor({ source: { kind: "blob", blob, name: file.name } });
+                } catch {
+                  alert("Couldn't open this image for editing");
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg img-edit-gradient text-white hover:brightness-110 transition-all text-sm font-medium"
+              title="Edit this image with AI"
+            >
+              <Wand2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Edit with AI</span>
+            </button>
+          )}
           {onAskAI && (
             <button
               onClick={() => {

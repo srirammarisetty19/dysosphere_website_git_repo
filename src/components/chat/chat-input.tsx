@@ -21,8 +21,12 @@ import {
   FileVideo,
   File as FileIcon,
   Loader2,
+  Wand2,
 } from "lucide-react";
-import { useGpuStatus } from "@/stores/gpu-store";
+import { useGpuStatus, useImageEditEnabled } from "@/stores/gpu-store";
+import { useImageEditorStore } from "@/stores/image-editor-store";
+import { useChatStore } from "@/stores/chat-store";
+import { GpuBusyBanner } from "@/components/image-edit/gpu-busy-banner";
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: File[]) => void;
@@ -42,6 +46,26 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
   const chunksRef = useRef<Blob[]>([]);
   const gpuStatus = useGpuStatus();
   const isWarmingUp = gpuStatus?.gpu_state === "swapping_to_ai";
+  const imageEditEnabled = useImageEditEnabled();
+  const openImageEditor = useImageEditorStore((s) => s.open);
+  const conversationId = useChatStore((s) => s.conversationId);
+
+  /** Open the AI image editor — with the first attached image + typed text if present. */
+  const handleEditImage = () => {
+    const idx = attachments.findIndex((f) => f.type.startsWith("image/"));
+    if (idx >= 0) {
+      const file = attachments[idx];
+      openImageEditor({
+        source: { kind: "blob", blob: file, name: file.name },
+        sessionId: conversationId,
+        prompt: message.trim(),
+      });
+      setAttachments((prev) => prev.filter((_, i) => i !== idx));
+      setMessage("");
+    } else {
+      openImageEditor({ sessionId: conversationId, prompt: message.trim() });
+    }
+  };
 
   // Auto-resize textarea
   useEffect(() => {
@@ -261,6 +285,9 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
           </div>
         )}
 
+        {/* AI image edit owns the GPU — "chat resumes in ~X s" */}
+        <GpuBusyBanner />
+
         {/* Drag overlay */}
         {isDragging && (
           <div className="mb-3 flex items-center justify-center py-6 rounded-2xl border-2 border-dashed border-[var(--color-accent-blue)]/30 bg-[var(--color-accent-blue)]/5 transition-all">
@@ -343,6 +370,23 @@ export function ChatInput({ onSend, isLoading, onStop, uploadProgress }: ChatInp
           >
             <Paperclip size={18} />
           </button>
+
+          {/* AI image editor */}
+          {imageEditEnabled && (
+            <button
+              id="chat-edit-image-button"
+              onClick={handleEditImage}
+              className={`p-2 rounded-lg transition-colors shrink-0 mb-0.5 ${
+                attachments.some((f) => f.type.startsWith("image/"))
+                  ? "text-[#a58bff] bg-[#7C4DFF]/10 hover:bg-[#7C4DFF]/20"
+                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-white/5"
+              }`}
+              title="Edit an image with AI"
+              aria-label="Edit an image with AI"
+            >
+              <Wand2 size={18} />
+            </button>
+          )}
 
           {/* Textarea */}
           <textarea

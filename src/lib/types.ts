@@ -93,6 +93,63 @@ export interface Message {
   sources?: Source[];
   /** Protocol v2: server-validated citations for this answer */
   annotations?: Annotation[];
+  /** AI image edits produced during this turn (edit_image tool) */
+  image_job_ids?: string[];
+}
+
+// ── AI Image Editing ────────────────────────────────────────────────────────
+// Mirrors server core/image_jobs.py job snapshot (GET /image-edits/{id}).
+
+export type ImageJobStatus = "queued" | "preparing" | "running" | "completed" | "failed" | "cancelled";
+export type ImageEditOperation = "auto" | "edit" | "remove_background" | "upscale" | "erase" | "restyle";
+export type ImageEditMode = "fast" | "standard" | "max";
+
+export interface ImageJob {
+  job_id: string;
+  status: ImageJobStatus;
+  stage: string;
+  progress: number; // 0..1
+  eta_seconds: number;
+  step?: number;
+  total_steps?: number;
+  operation: ImageEditOperation | string;
+  mode: ImageEditMode | string;
+  instruction: string;
+  error?: string | null;
+  width?: number | null;
+  height?: number | null;
+  input_width?: number | null;
+  input_height?: number | null;
+  model?: string | null;
+  seed?: number | null;
+  session_id?: string | null;
+  parent_job_id?: string | null;
+  has_mask?: boolean;
+  nas_file_id?: string | null;
+  created_at?: number | null;
+  finished_at?: number | null;
+  duration_seconds?: number | null;
+  queue_position?: number | null;
+  input_url?: string | null;
+  result_url?: string | null;
+  thumb_url?: string | null;
+}
+
+export const IMAGE_JOB_TERMINAL: ReadonlySet<string> = new Set(["completed", "failed", "cancelled"]);
+
+export interface ImageEditRequest {
+  /** Raw image bytes (new uploads, NAS files, chat images) */
+  image?: Blob | null;
+  /** Continue from a previous result without re-uploading */
+  parentJobId?: string | null;
+  /** PNG — white = edit, black = keep */
+  mask?: Blob | null;
+  instruction?: string;
+  operation?: ImageEditOperation;
+  mode?: ImageEditMode;
+  sessionId?: string | null;
+  seed?: number | null;
+  upscaleFactor?: 2 | 4;
 }
 
 // ── Protocol v2: typed run items, sources, citations ────────────────────────
@@ -205,7 +262,10 @@ export type StreamEventType =
   | "message.annotations"
   | "approval.requested"
   | "takeover.requested"
-  | "takeover.ended";
+  | "takeover.ended"
+  // AI image editing
+  | "gpu_wait"         // chat is queued behind an image edit (content = banner text)
+  | "image_job";       // edit_image tool created/updated a job (data = ImageJob)
 
 export interface StreamEvent {
   type: StreamEventType;
@@ -294,13 +354,32 @@ export interface HeartbeatResult {
 // ── GPU Status ──────────────────────────────────────────────────────────
 // Server: GET /gpu/status (GpuStatusResponse)
 
-export type GpuState = "ai_ready" | "nas_processing" | "swapping_to_ai" | "unknown";
+export type GpuState =
+  | "ai_ready"
+  | "nas_processing"
+  | "swapping_to_ai"
+  | "draining_for_image"
+  | "swapping_to_image"
+  | "image_ready"
+  | "unknown";
 
 export interface GpuStatus {
   llama_loaded: boolean;
   nas_processing: boolean;
   active_sessions: number;
   gpu_state: GpuState | string;
+  // AI image editing (absent on older servers)
+  orchestrator_state?: string | null;
+  image_edit_enabled?: boolean;
+  /** GPU is owned by image editing — chat replies wait */
+  image_busy?: boolean;
+  image_queue_length?: number;
+  image_running_job?: string | null;
+  llm_waiters?: number;
+  /** Seconds until chat is available again */
+  eta_seconds?: number | null;
+  /** Human-readable banner text */
+  message?: string | null;
 }
 
 // ── Tools ───────────────────────────────────────────────────────────────

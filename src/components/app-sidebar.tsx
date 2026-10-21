@@ -25,9 +25,11 @@ import {
   FileText,
   PanelLeftClose,
   Puzzle,
+  Wand2,
 } from "lucide-react";
 import { useChatStore } from "@/stores/chat-store";
-import { useGpuStatus } from "@/stores/gpu-store";
+import { useGpuStatus, useImageEditEnabled } from "@/stores/gpu-store";
+import { useImageEditorStore } from "@/stores/image-editor-store";
 import { DSLogo } from "@/components/ui/ds-logo";
 
 interface AppSidebarProps {
@@ -122,6 +124,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed = false, onToggleColla
               </Link>
             );
           })}
+          <ImageEditorNavItem onClose={onClose} />
         </nav>
 
         {/* Chat-specific section — only show when on /chat */}
@@ -319,14 +322,42 @@ function ChatSection({ onClose }: { onClose: () => void }) {
 
 // ── GPU Status Indicator ───────────────────────────────────────────────
 // Reads the shared GPU poller (stores/gpu-store.ts) and shows a compact badge.
-// States: ai_ready (green), swapping_to_ai (yellow pulsing), nas_processing (blue), unknown (gray)
+// States: ai_ready (green), swapping_to_ai (yellow pulsing), nas_processing (blue), unknown (gray),
+// image editing (violet): draining_for_image, swapping_to_image, image_ready
 
 const GPU_STATE_CONFIG: Record<string, { color: string; label: string; pulse?: boolean }> = {
   ai_ready: { color: "bg-emerald-400", label: "AI Ready" },
   swapping_to_ai: { color: "bg-amber-400", label: "Warming up…", pulse: true },
   nas_processing: { color: "bg-sky-400", label: "NAS Processing" },
+  draining_for_image: { color: "bg-violet-400", label: "Preparing image edit…", pulse: true },
+  swapping_to_image: { color: "bg-violet-400", label: "Loading image model…", pulse: true },
+  image_ready: { color: "bg-violet-400", label: "Creating image…", pulse: true },
   unknown: { color: "bg-white/30", label: "Unknown" },
 };
+
+// ── Image Editor entry (opens the full-screen editor) ──────────────────────
+function ImageEditorNavItem({ onClose }: { onClose: () => void }) {
+  const enabled = useImageEditEnabled();
+  const open = useImageEditorStore((s) => s.open);
+  const sessionId = useChatStore((s) => s.conversationId);
+  if (!enabled) return null;
+  return (
+    <button
+      id="sidebar-image-editor"
+      onClick={() => {
+        open({ sessionId });
+        onClose();
+      }}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] hover:bg-white/[0.04] transition-all"
+    >
+      <Wand2 size={16} />
+      Image Editor
+      <span className="ml-auto text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md img-edit-gradient text-white">
+        New
+      </span>
+    </button>
+  );
+}
 
 function GpuStatusIndicator() {
   const gpuState = useGpuStatus();
@@ -357,6 +388,12 @@ function GpuStatusIndicator() {
           <p>Model loaded: {gpuState.llama_loaded ? "✓ Yes" : "✗ No"}</p>
           <p>Active sessions: {gpuState.active_sessions}</p>
           <p>NAS processing: {gpuState.nas_processing ? "Yes" : "No"}</p>
+          {gpuState.image_busy && (
+            <p className="text-violet-300/80">
+              Image editing{gpuState.eta_seconds ? ` · ~${gpuState.eta_seconds}s` : ""}
+              {gpuState.image_queue_length ? ` · ${gpuState.image_queue_length} queued` : ""}
+            </p>
+          )}
         </div>
       )}
     </div>

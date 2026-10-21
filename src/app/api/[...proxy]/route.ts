@@ -92,6 +92,10 @@ async function proxyRequest(req: NextRequest, params: { proxy: string[] }) {
   const contentType = req.headers.get("content-type");
   if (contentType) headers["Content-Type"] = contentType;
 
+  // Image-edit submissions are deduplicated server-side by this header
+  const idempotencyKey = req.headers.get("idempotency-key");
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+
   // Build fetch options
   const fetchOptions: RequestInit = {
     method: req.method,

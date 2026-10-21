@@ -41,7 +41,15 @@ import {
   RefreshCw,
   Volume2,
   VolumeX,
+  Wand2,
 } from "lucide-react";
+import { nasApiClient } from "@/lib/nas-api-client";
+import type { ImageJob } from "@/lib/types";
+import { useImageJobStore } from "@/stores/image-job-store";
+import { useImageEditorStore } from "@/stores/image-editor-store";
+import { useImageEditEnabled } from "@/stores/gpu-store";
+import { ImageJobCard } from "@/components/image-edit/image-job-card";
+import { GpuBusyBanner } from "@/components/image-edit/gpu-busy-banner";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -51,6 +59,7 @@ interface ChatMessage {
   thinkingContent?: string; // Pre-parsed thinking text
   timestamp: Date;
   imageUrls?: string[];
+  imageJobIds?: string[]; // AI image edits (edit_image tool)
 }
 
 interface QuickAction {
@@ -207,6 +216,10 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingImageUrls, setStreamingImageUrls] = useState<string[]>([]);
+  const [streamingImageJobIds, setStreamingImageJobIds] = useState<string[]>([]);
+  const imageEditEnabled = useImageEditEnabled();
+  const openImageEditor = useImageEditorStore((s) => s.open);
+  const [openingEditor, setOpeningEditor] = useState(false);
   const [currentActivity, setCurrentActivity] = useState("");
   const [showChips, setShowChips] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -301,6 +314,7 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
         const decoder = new TextDecoder();
         let buffer = "";
         const currentImageUrls: string[] = [];
+        let currentImageJobIds: string[] = [];
 
         try {
           while (true) {
@@ -354,6 +368,21 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
                   case "activity":
                     setCurrentActivity(event.content || "💭 Thinking...");
                     break;
+                  case "gpu_wait":
+                    // Reply is queued behind an AI image edit
+                    setCurrentActivity(event.content || "🎨 AI is busy creating an image…");
+                    break;
+                  case "image_job": {
+                    const job = event.data as ImageJob | undefined;
+                    if (job?.job_id) {
+                      useImageJobStore.getState().upsert(job);
+                      if (!currentImageJobIds.includes(job.job_id)) {
+                        currentImageJobIds = [...currentImageJobIds, job.job_id];
+                        setStreamingImageJobIds(currentImageJobIds);
+                      }
+                    }
+                    break;
+                  }
                   case "tool_call":
                     // Show tool name as activity, don't dump raw content
                     setCurrentActivity(`🔧 Running ${event.tool || "tool"}...`);
@@ -401,7 +430,7 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
         // Finalize — apply full parser to the raw accumulated response
         const finalParsed = parseStructuredContent(rawAccumulatedRef.current);
         const finalThinking = thinkingAccumulatedRef.current || finalParsed.thinking;
-        if (finalParsed.content) {
+        if (finalParsed.content || currentImageJobIds.length > 0) {
           setMessages((prev) => [
             ...prev,
             {
@@ -410,6 +439,7 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
               thinkingContent: finalThinking || undefined,
               timestamp: new Date(),
               imageUrls: currentImageUrls.length > 0 ? [...currentImageUrls] : undefined,
+              imageJobIds: currentImageJobIds.length > 0 ? [...currentImageJobIds] : undefined,
             },
           ]);
         }
@@ -429,6 +459,7 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
         setIsLoading(false);
         setCurrentActivity("");
         setStreamingImageUrls([]);
+        setStreamingImageJobIds([]);
         setStreamingThinking("");
         if (thinkingTimerRef.current) clearInterval(thinkingTimerRef.current);
         rawAccumulatedRef.current = "";
@@ -443,7 +474,7 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
     abortControllerRef.current?.abort();
     const finalParsed = parseStructuredContent(rawAccumulatedRef.current);
     const finalThinking = thinkingAccumulatedRef.current || finalParsed.thinking;
-    if (finalParsed.content) {
+    if (finalParsed.content || streamingImageJobIds.length > 0) {
       setMessages((prev) => [
         ...prev,
         {
@@ -452,24 +483,40 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
           thinkingContent: finalThinking || undefined,
           timestamp: new Date(),
           imageUrls: streamingImageUrls.length > 0 ? [...streamingImageUrls] : undefined,
+          imageJobIds: streamingImageJobIds.length > 0 ? [...streamingImageJobIds] : undefined,
         },
       ]);
     }
     setStreamingContent("");
     setStreamingImageUrls([]);
+    setStreamingImageJobIds([]);
     rawAccumulatedRef.current = "";
     setIsLoading(false);
     setCurrentActivity("");
   };
 
-  // Close on Escape
+  // Close on Escape (unless the image editor is open on top)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !useImageEditorStore.getState().isOpen) onClose();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  /** Open this NAS image in the full-screen AI editor. */
+  const handleEditImage = async () => {
+    if (openingEditor) return;
+    setOpeningEditor(true);
+    try {
+      const blob = await nasApiClient.downloadFile(file.id);
+      openImageEditor({ source: { kind: "blob", blob, name: file.name }, sessionId });
+    } catch {
+      setCurrentActivity("⚠️ Couldn't open this image for editing");
+    } finally {
+      setOpeningEditor(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -509,6 +556,19 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
               </span>
             </div>
           </div>
+
+          {/* Edit with AI (images) */}
+          {fileType === "image" && imageEditEnabled && (
+            <button
+              onClick={() => void handleEditImage()}
+              disabled={openingEditor}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white img-edit-gradient hover:brightness-110 transition-all disabled:opacity-60"
+              title="Edit this image with AI"
+            >
+              {openingEditor ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+              Edit
+            </button>
+          )}
 
           {/* Close */}
           <button
@@ -613,6 +673,14 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
                             })}
                           </div>
                         )}
+                        {/* AI image edits */}
+                        {msg.imageJobIds && msg.imageJobIds.length > 0 && (
+                          <div className="flex flex-col gap-2 mt-2">
+                            {msg.imageJobIds.map((id) => (
+                              <ImageJobCard key={id} jobId={id} />
+                            ))}
+                          </div>
+                        )}
                         {/* ── Action Row (Copy, Read Aloud) ── */}
                         <NasChatActionRow
                           content={msg.content}
@@ -671,6 +739,15 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
                 </div>
               )}
 
+              {/* AI image edits created during the current reply */}
+              {streamingImageJobIds.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {streamingImageJobIds.map((id) => (
+                    <ImageJobCard key={id} jobId={id} />
+                  ))}
+                </div>
+              )}
+
               <div ref={chatEndRef} />
             </div>
           )}
@@ -687,6 +764,8 @@ export function FileAIChatPanel({ file, onClose }: FileAIChatPanelProps) {
 
         {/* ── Input Bar ──────────────────────────────────────────────── */}
         <div className="px-3 py-3 border-t border-border-subtle">
+          {/* AI image edit owns the GPU — "chat resumes in ~X s" */}
+          <GpuBusyBanner />
           <div className="flex items-center gap-2">
             <input
               ref={inputRef}
