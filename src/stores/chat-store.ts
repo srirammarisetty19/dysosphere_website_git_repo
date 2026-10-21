@@ -16,9 +16,11 @@ import {
 } from "@/lib/run-items";
 import { useImageJobStore } from "@/stores/image-job-store";
 
-/** Chat reply is queued behind an AI image edit (server `gpu_wait` event). */
+/** Chat reply is waiting for the GPU (server `gpu_wait` event). */
 export interface GpuWaitState {
   message: string;
+  /** "image_busy" = an image edit is running; "warming_up" = model (re)loading */
+  reason: string;
   etaSeconds: number | null;
   /** Date.now() when the ETA was received (for a local countdown) */
   receivedAt: number;
@@ -26,11 +28,13 @@ export interface GpuWaitState {
 
 function gpuWaitFromEvent(event: StreamEvent): GpuWaitState {
   const eta = Number(event.data?.eta_seconds);
+  const reason = typeof event.data?.reason === "string" ? event.data.reason : "image_busy";
   return {
     message:
       event.content ||
       (typeof event.data?.message === "string" ? event.data.message : "") ||
-      "🎨 AI is busy creating an image",
+      (reason === "image_busy" ? "🎨 AI is busy creating an image" : "Warming up AI…"),
+    reason,
     etaSeconds: Number.isFinite(eta) ? eta : null,
     receivedAt: Date.now(),
   };
@@ -794,7 +798,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     const { abortController } = get();
     if (abortController) {
       abortController.abort();
-      set({ abortController: null, isLoading: false, isResuming: false });
+      set({ abortController: null, isLoading: false, isResuming: false, gpuWait: null });
     }
   },
 
@@ -810,7 +814,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         // Non-critical
       }
     }
-    set({ isLoading: false, isResuming: false, abortController: null });
+    set({ isLoading: false, isResuming: false, abortController: null, gpuWait: null });
   },
 
   loadConversation: async (conversationId) => {
@@ -824,7 +828,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     // on the last assistant message. isLoading is only set when actually
     // resuming an active run. This matches the Flutter pattern and prevents
     // the 3-second "thinking" flash on conversation reload.
-    set({ isLoadingHistory: true, errorMessage: null, abortController: null });
+    set({ isLoadingHistory: true, errorMessage: null, abortController: null, gpuWait: null });
     try {
       const data = await apiClient.getConversation(conversationId);
       // Normalize server roles to UI roles and group blocks into turns

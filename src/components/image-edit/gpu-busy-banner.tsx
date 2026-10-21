@@ -9,7 +9,7 @@
 // The ETA counts down locally every second between server updates.
 // ============================================================================
 
-import { Palette } from "lucide-react";
+import { Loader2, Palette } from "lucide-react";
 import { useChatStore } from "@/stores/chat-store";
 import { isImageBusy, useEtaCountdown, useGpuStatus, useGpuStore } from "@/stores/gpu-store";
 
@@ -45,6 +45,27 @@ export function GpuBusyBanner({ variant = "bar", onlyWhenWaiting = false, classN
         : `chat resumes in ~${remaining < 60 ? `${remaining} s` : `${Math.ceil(remaining / 60)} min`}`;
 
   if (variant === "inline") {
+    // Not an image edit (e.g. the model is switching back to chat after the
+    // image engine was idle) → neutral "warming up" line with the server text.
+    if (fromStream && gpuWait.reason !== "image_busy") {
+      const text = gpuWait.message.replace(/\s*·\s*ready in ~.*$/i, "");
+      return (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-white/[0.03] ${className}`}
+        >
+          <Loader2 size={14} className="text-amber-300/80 animate-spin shrink-0" />
+          <span className="text-[13px] text-white/80">
+            {text}
+            <span className="text-white/45">
+              {" · "}
+              {remaining == null ? "ready shortly" : remaining <= 1 ? "any moment" : `ready in ~${remaining} s`}
+            </span>
+          </span>
+        </div>
+      );
+    }
     return (
       <div
         role="status"

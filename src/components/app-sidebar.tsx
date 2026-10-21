@@ -365,7 +365,10 @@ function GpuStatusIndicator() {
 
   if (!gpuState) return null;
 
-  const config = GPU_STATE_CONFIG[gpuState.gpu_state] || GPU_STATE_CONFIG.unknown;
+  const config =
+    gpuState.gpu_state === "image_ready" && gpuState.image_busy === false
+      ? { color: "bg-violet-400/60", label: "Image engine idle" }
+      : GPU_STATE_CONFIG[gpuState.gpu_state] || GPU_STATE_CONFIG.unknown;
 
   return (
     <div

@@ -20,10 +20,13 @@ const IMAGE_BUSY_INTERVAL_MS = 3_000;
 
 const IMAGE_GPU_STATES = new Set(["draining_for_image", "swapping_to_image", "image_ready"]);
 
-/** True while AI image editing owns the GPU (chat replies wait). */
+/** True only while an AI image edit is actually queued / running / loading. */
 export function isImageBusy(status: GpuStatus | null | undefined): boolean {
   if (!status) return false;
-  return !!status.image_busy || IMAGE_GPU_STATES.has(String(status.gpu_state));
+  // Server sends image_busy=false while the image engine merely lingers idle
+  // after an edit — that must not show "AI is busy creating an image".
+  if (typeof status.image_busy === "boolean") return status.image_busy;
+  return IMAGE_GPU_STATES.has(String(status.gpu_state)); // older servers
 }
 
 interface GpuStoreState {
