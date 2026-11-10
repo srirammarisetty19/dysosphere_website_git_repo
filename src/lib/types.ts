@@ -192,6 +192,7 @@ export interface RunItemData {
   final_url?: string;
   queue_position?: number | null;
   live?: boolean;
+  takeover?: boolean;
   sandboxed?: boolean;
   provider?: string;
   steps_taken?: number;
@@ -261,6 +262,7 @@ export type StreamEventType =
   | "item.cancelled"
   | "message.annotations"
   | "approval.requested"
+  | "approval.resolved"
   | "takeover.requested"
   | "takeover.ended"
   // AI image editing
@@ -458,6 +460,105 @@ export interface UploadResult {
   metadata?: Record<string, unknown>;
   image_urls?: string[];
   image_id?: string;
+}
+
+// ── Saved Logins Vault & Browser Approvals ──────────────────────────────
+
+export type CredentialProtection = "automatic" | "locked";
+export type CredentialApprovalPolicy = "first_time" | "every_time" | "never_ask";
+export type CredentialMatchMode = "exact" | "site";
+
+export interface SavedLogin {
+  id: string;
+  label: string;
+  origin: string;
+  domain: string;
+  linked_origins: string[];
+  match_mode: CredentialMatchMode;
+  username_hint: string;
+  has_totp: boolean;
+  protection: CredentialProtection;
+  approval_policy: CredentialApprovalPolicy;
+  created_at: string | null;
+  updated_at: string | null;
+  last_used_at: string | null;
+  use_count: number;
+}
+
+export interface CreateSavedLoginInput {
+  origin: string;
+  username: string;
+  password: string;
+  label?: string;
+  linked_origins?: string[];
+  match_mode?: CredentialMatchMode;
+  totp_secret?: string;
+  protection?: CredentialProtection;
+  approval_policy?: CredentialApprovalPolicy;
+  passphrase?: string;
+}
+
+export interface UpdateSavedLoginInput {
+  label?: string;
+  origin?: string;
+  linked_origins?: string[];
+  match_mode?: CredentialMatchMode;
+  username?: string;
+  password?: string;
+  totp_secret?: string;
+  clear_totp?: boolean;
+  protection?: CredentialProtection;
+  approval_policy?: CredentialApprovalPolicy;
+  passphrase?: string;
+  current_passphrase?: string;
+}
+
+export interface RevealedSavedLogin {
+  id: string;
+  origin: string;
+  username: string | null;
+  password: string | null;
+  has_totp: boolean;
+}
+
+export interface BrowserSavedSession {
+  id: string;
+  site_domain: string;
+  origin: string;
+  cookie_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+  expires_at: string | null;
+}
+
+export type ApprovalDecision =
+  | "allow_once"
+  | "allow_always"
+  | "takeover"
+  | "saved_login"
+  | "deny";
+
+export type ApprovalKind =
+  | "credential_use"
+  | "needs_login"
+  | "takeover"
+  | "tool_call";
+
+export interface ApprovalRequestPayload {
+  approval_id: string;
+  kind: ApprovalKind;
+  title: string;
+  description: string;
+  origin: string;
+  credential_id?: string | null;
+  username_hint?: string | null;
+  requires_passphrase: boolean;
+  allow_always_option: boolean;
+  options: ApprovalDecision[];
+  item_id?: string | null;
+  run_id?: string | null;
+  created_at: number;
+  expires_at: number;
 }
 
 // ── Calendar ────────────────────────────────────────────────────────────

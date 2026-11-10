@@ -35,6 +35,13 @@ import type {
   UserSkillInput,
   ImageJob,
   ImageEditRequest,
+  SavedLogin,
+  CreateSavedLoginInput,
+  UpdateSavedLoginInput,
+  RevealedSavedLogin,
+  BrowserSavedSession,
+  ApprovalDecision,
+  ApprovalRequestPayload,
 } from "./types";
 
 class ApiClientError extends Error {
@@ -73,6 +80,7 @@ const ROUTE_MAP: Record<string, string> = {
   scheduler: "scheduler",
   skills: "skills",
   browser: "browser",
+  approvals: "approvals",
 };
 
 class ApiClient {
@@ -835,6 +843,22 @@ class ApiClient {
     });
   }
 
+  async startBrowserTakeover(itemId: string): Promise<{ takeover: boolean; item_id: string; url: string }> {
+    return this.request(`/api/browser/sessions/${encodeURIComponent(itemId)}/takeover`, {
+      method: "POST",
+    });
+  }
+
+  async completeBrowserTakeover(
+    itemId: string,
+    outcome: "completed" | "cancelled" = "completed",
+  ): Promise<{ takeover: boolean; outcome: string; url: string }> {
+    return this.request(`/api/browser/sessions/${encodeURIComponent(itemId)}/takeover/complete`, {
+      method: "POST",
+      body: JSON.stringify({ outcome }),
+    });
+  }
+
   browserLiveUrl(itemId: string, ticket: string): string | null {
     const server = this.getServerUrl();
     const base = server
@@ -1275,6 +1299,97 @@ class ApiClient {
 
   async disconnectTelegram(): Promise<void> {
     await this.request("/api/integrations/telegram/setup", { method: "DELETE" });
+  }
+
+  // ── Saved Logins Vault & Browser Sessions ──────────────────────────
+  // Server: /integrations/logins/* and /approvals/*
+
+  async getSavedLogins(): Promise<SavedLogin[]> {
+    const data = await this.request<{ logins: SavedLogin[]; total: number }>("/api/integrations/logins");
+    return data.logins ?? [];
+  }
+
+  async createSavedLogin(input: CreateSavedLoginInput): Promise<SavedLogin> {
+    const data = await this.request<{ login: SavedLogin }>("/api/integrations/logins", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return data.login;
+  }
+
+  async updateSavedLogin(id: string, input: UpdateSavedLoginInput): Promise<SavedLogin> {
+    const data = await this.request<{ login: SavedLogin }>(
+      `/api/integrations/logins/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      },
+    );
+    return data.login;
+  }
+
+  async deleteSavedLogin(id: string): Promise<void> {
+    await this.request(`/api/integrations/logins/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  }
+
+  async revealSavedLogin(
+    id: string,
+    accountPassword: string,
+    passphrase?: string,
+  ): Promise<RevealedSavedLogin> {
+    return this.request<RevealedSavedLogin>(
+      `/api/integrations/logins/${encodeURIComponent(id)}/reveal`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          account_password: accountPassword,
+          ...(passphrase ? { passphrase } : {}),
+        }),
+      },
+    );
+  }
+
+  async getBrowserSavedSessions(): Promise<BrowserSavedSession[]> {
+    const data = await this.request<{ sessions: BrowserSavedSession[]; total: number }>(
+      "/api/integrations/logins/sessions",
+    );
+    return data.sessions ?? [];
+  }
+
+  async revokeBrowserSavedSession(sessionId: string): Promise<void> {
+    await this.request(`/api/integrations/logins/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE",
+    });
+  }
+
+  async revokeAllBrowserSavedSessions(): Promise<{ revoked_count: number }> {
+    return this.request("/api/integrations/logins/sessions", {
+      method: "DELETE",
+    });
+  }
+
+  async getPendingApprovals(): Promise<ApprovalRequestPayload[]> {
+    const data = await this.request<{ approvals: ApprovalRequestPayload[]; total: number }>(
+      "/api/approvals/pending",
+    );
+    return data.approvals ?? [];
+  }
+
+  async resolveApproval(
+    approvalId: string,
+    decision: ApprovalDecision,
+    opts?: { passphrase?: string; credential_id?: string },
+  ): Promise<{ approval_id: string; decision: string }> {
+    return this.request(`/api/approvals/${encodeURIComponent(approvalId)}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({
+        decision,
+        ...(opts?.passphrase ? { passphrase: opts.passphrase } : {}),
+        ...(opts?.credential_id ? { credential_id: opts.credential_id } : {}),
+      }),
+    });
   }
 
   // ── Notifications (extended) ────────────────────────────────────────

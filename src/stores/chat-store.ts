@@ -5,7 +5,16 @@
 // ============================================================================
 
 import { create } from "zustand";
-import type { Message, MessagePart, Conversation, NasFileResult, ImageJob, StreamEvent } from "@/lib/types";
+import type {
+  Message,
+  MessagePart,
+  Conversation,
+  NasFileResult,
+  ImageJob,
+  StreamEvent,
+  ApprovalDecision,
+  ApprovalRequestPayload,
+} from "@/lib/types";
 import { apiClient, ApiClientError } from "@/lib/api-client";
 import {
   applyRunEvent,
@@ -64,6 +73,7 @@ interface ChatState {
   errorMessage: string | null;
   truncationWarning: string | null;  // Shown when input was truncated (Google/OpenAI typed event)
   gpuWait: GpuWaitState | null;      // Reply waiting for an AI image edit to release the GPU
+  pendingApprovals: ApprovalRequestPayload[]; // Active sign-in / unlock / takeover approvals
 
   // Upload progress (null when not uploading)
   uploadProgress: { current: number; total: number; filename: string } | null;
@@ -105,6 +115,11 @@ interface ChatState {
   clearError: () => void;
   clearTruncationWarning: () => void;
   retryMessage: (assistantMessageIndex: number) => void;
+  resolveApproval: (
+    approvalId: string,
+    decision: ApprovalDecision,
+    opts?: { passphrase?: string; credential_id?: string },
+  ) => Promise<void>;
 }
 
 // ── State-Machine Structured Response Parser ──────────────────────
@@ -300,6 +315,20 @@ export const useChatStore = create<ChatState>()((set, get) => {
         // run-status check failed — non-critical
       }
     });
+
+    apiClient.onNotification((event) => {
+      if (event.notif_type === "approval_requested" && event.approval && typeof event.approval === "object") {
+        const appr = event.approval as ApprovalRequestPayload;
+        if (appr.approval_id) {
+          set((s) => ({
+            pendingApprovals: [
+              ...s.pendingApprovals.filter((p) => p.approval_id !== appr.approval_id),
+              appr,
+            ],
+          }));
+        }
+      }
+    });
   }
 
   return {
@@ -315,6 +344,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
   errorMessage: null,
   truncationWarning: null,
   gpuWait: null,
+  pendingApprovals: [],
   uploadProgress: null,
   conversations: [],
   isLoadingHistory: false,
@@ -540,9 +570,14 @@ export const useChatStore = create<ChatState>()((set, get) => {
           if (_generationId !== myGeneration) break;
           hasReceivedData = true;
 
-          // Protocol v2 (typed items, citations) — shared reducer
+          // Protocol v2 (typed items, citations, approvals) — shared reducer
           const nextRun = applyRunEvent(runState, event);
-          if (nextRun) runState = nextRun;
+          if (nextRun) {
+            runState = nextRun;
+            if (event.type === "approval.requested" || event.type === "approval.resolved") {
+              set({ pendingApprovals: runState.pendingApprovals });
+            }
+          }
 
           // Any real output means the GPU wait is over
           if (event.type !== "gpu_wait" && get().gpuWait) set({ gpuWait: null });
@@ -768,6 +803,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         isResuming: false,
         currentActivity: null,
         gpuWait: null,
+        pendingApprovals: [],
         uploadProgress: null,
         abortController: null,
       });
@@ -910,7 +946,12 @@ export const useChatStore = create<ChatState>()((set, get) => {
               if (_generationId !== myGeneration) break;
 
               const nextRun = applyRunEvent(runState, event);
-              if (nextRun) runState = nextRun;
+              if (nextRun) {
+                runState = nextRun;
+                if (event.type === "approval.requested" || event.type === "approval.resolved") {
+                  set({ pendingApprovals: runState.pendingApprovals });
+                }
+              }
 
               if (event.type !== "gpu_wait" && get().gpuWait) set({ gpuWait: null });
 
@@ -1082,6 +1123,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
               isResuming: false,
               currentActivity: null,
               gpuWait: null,
+              pendingApprovals: [],
               abortController: null,
               iterationSummaries: [],
             });
@@ -1213,6 +1255,13 @@ export const useChatStore = create<ChatState>()((set, get) => {
   clearError: () => set({ errorMessage: null }),
 
   clearTruncationWarning: () => set({ truncationWarning: null }),
+
+  resolveApproval: async (approvalId, decision, opts) => {
+    await apiClient.resolveApproval(approvalId, decision, opts);
+    set((s) => ({
+      pendingApprovals: s.pendingApprovals.filter((p) => p.approval_id !== approvalId),
+    }));
+  },
 
   retryMessage: (assistantMessageIndex: number) => {
     const { messages, isLoading, sendMessage } = get();

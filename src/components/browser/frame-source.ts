@@ -16,11 +16,15 @@
 import { apiClient } from "@/lib/api-client";
 
 export type LiveStatus = "connecting" | "live" | "reconnecting" | "ended" | "error";
+export type LiveMode = "view" | "control";
 
 export interface LiveMeta {
   url?: string;
   title?: string;
   step?: number;
+  viewport?: { width: number; height: number };
+  mode?: LiveMode;
+  takeover?: boolean;
 }
 
 export interface FrameListener {
@@ -39,16 +43,46 @@ class FrameSource {
   private listeners = new Set<FrameListener>();
   private lastFrame: ImageBitmap | null = null;
   private status: LiveStatus = "connecting";
+  private mode: LiveMode = "view";
   private meta: LiveMeta = {};
   private retries = 0;
   private closed = false;
+  private switchingMode = false;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private decoding = false;
   private pendingBlob: Blob | null = null;
 
-  constructor(itemId: string) {
+  constructor(itemId: string, initialMode: LiveMode = "view") {
     this.itemId = itemId;
+    this.mode = initialMode;
+    void this.connect();
+  }
+
+  get currentMode(): LiveMode {
+    return this.mode;
+  }
+
+  setMode(nextMode: LiveMode): void {
+    if (this.closed || this.mode === nextMode) return;
+    this.mode = nextMode;
+    this.retries = 0;
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
+    }
+    this.switchingMode = true;
+    try {
+      this.ws?.close(1000, "mode-switch");
+    } catch {
+      /* ignore */
+    }
+    this.ws = null;
+    this.switchingMode = false;
     void this.connect();
   }
 
@@ -96,7 +130,7 @@ class FrameSource {
     this.setStatus(this.retries === 0 ? "connecting" : "reconnecting");
     let url: string | null = null;
     try {
-      const { ticket } = await apiClient.createBrowserTicket(this.itemId, "view");
+      const { ticket } = await apiClient.createBrowserTicket(this.itemId, this.mode);
       url = apiClient.browserLiveUrl(this.itemId, ticket);
     } catch {
       url = null;
@@ -126,7 +160,7 @@ class FrameSource {
     ws.onclose = (ev) => {
       if (this.pingTimer) clearInterval(this.pingTimer);
       if (this.ws === ws) this.ws = null;
-      if (this.closed || this.status === "ended") return;
+      if (this.closed || this.switchingMode || this.status === "ended") return;
       // 4001 = bad/expired ticket (retry once with a fresh one),
       // 4004 = no live browser (task finished) → terminal.
       if (ev.code === 4004) {
@@ -160,10 +194,28 @@ class FrameSource {
     switch (msg.type) {
       case "hello":
       case "page": {
+        const vp = msg.viewport as { width?: number; height?: number } | undefined;
         this.meta = {
+          ...this.meta,
           url: (msg.url as string) ?? this.meta.url,
           title: (msg.title as string) ?? this.meta.title,
           step: (msg.step as number) ?? this.meta.step,
+          viewport:
+            vp && typeof vp.width === "number" && vp.width > 0 && typeof vp.height === "number" && vp.height > 0
+              ? { width: vp.width, height: vp.height }
+              : this.meta.viewport,
+          mode: (msg.mode as LiveMode) ?? this.meta.mode,
+          takeover: typeof msg.takeover === "boolean" ? msg.takeover : this.meta.takeover,
+        };
+        const m = this.meta;
+        this.listeners.forEach((l) => l.onMeta?.(m));
+        break;
+      }
+      case "takeover": {
+        this.meta = {
+          ...this.meta,
+          takeover: Boolean(msg.active),
+          url: (msg.url as string) ?? this.meta.url,
         };
         const m = this.meta;
         this.listeners.forEach((l) => l.onMeta?.(m));
@@ -239,6 +291,15 @@ export function subscribeLive(itemId: string, listener: FrameListener): () => vo
 
 export function sendLive(itemId: string, msg: Record<string, unknown>): void {
   if (active?.itemId === itemId) active.send(msg);
+}
+
+export function setLiveMode(itemId: string, mode: LiveMode): void {
+  if (!active || active.itemId !== itemId) {
+    active?.close();
+    active = new FrameSource(itemId, mode);
+    return;
+  }
+  active.setMode(mode);
 }
 
 /** Draw a bitmap letterboxed into a canvas, sized for the device pixel ratio. */

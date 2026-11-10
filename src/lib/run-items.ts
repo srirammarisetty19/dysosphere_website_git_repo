@@ -6,15 +6,21 @@
 // an idempotent upsert by id (replay after reconnect is safe).
 // ============================================================================
 
-import type { Annotation, Message, RunItem, Source, StreamEvent } from "./types";
+import type { Annotation, ApprovalRequestPayload, Message, RunItem, Source, StreamEvent } from "./types";
 
 export interface RunState {
   items: RunItem[];
   sources: Source[];
   annotations: Annotation[];
+  pendingApprovals: ApprovalRequestPayload[];
 }
 
-export const emptyRunState = (): RunState => ({ items: [], sources: [], annotations: [] });
+export const emptyRunState = (): RunState => ({
+  items: [],
+  sources: [],
+  annotations: [],
+  pendingApprovals: [],
+});
 
 const TERMINAL = new Set(["completed", "failed", "cancelled"]);
 
@@ -58,6 +64,41 @@ export function applyRunEvent(state: RunState, event: StreamEvent): RunState | n
       ...state,
       annotations: event.data.annotations ?? [],
       sources: mergeSources(state.sources, event.data.sources),
+    };
+  }
+  if (t === "approval.requested" && event.data && typeof event.data.approval_id === "string") {
+    const incoming = event.data as unknown as ApprovalRequestPayload;
+    const filtered = state.pendingApprovals.filter((a) => a.approval_id !== incoming.approval_id);
+    return {
+      ...state,
+      pendingApprovals: [...filtered, incoming],
+    };
+  }
+  if (t === "approval.resolved" && event.data && typeof event.data.approval_id === "string") {
+    const resolvedId = event.data.approval_id;
+    return {
+      ...state,
+      pendingApprovals: state.pendingApprovals.filter((a) => a.approval_id !== resolvedId),
+    };
+  }
+  if ((t === "takeover.requested" || t === "takeover.ended") && event.data && typeof event.data.item_id === "string") {
+    const targetId = event.data.item_id;
+    const active = t === "takeover.requested";
+    return {
+      ...state,
+      items: state.items.map((it) =>
+        it.id === targetId
+          ? {
+              ...it,
+              data: {
+                ...it.data,
+                takeover: active,
+                phase: active ? "waiting_for_user" : (it.data?.phase === "waiting_for_user" ? "acting" : it.data?.phase),
+                ...(typeof event.data?.url === "string" && event.data.url ? { url: event.data.url } : {}),
+              },
+            }
+          : it
+      ),
     };
   }
   return null;

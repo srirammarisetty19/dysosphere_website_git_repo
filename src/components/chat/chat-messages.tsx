@@ -37,6 +37,7 @@ import {
 import { apiClient } from "@/lib/api-client";
 import { useChatStore } from "@/stores/chat-store";
 import { ActivityTimeline } from "@/components/chat/activity/activity-timeline";
+import { BrowserApprovalPrompt } from "@/components/browser/browser-live-card";
 import { SourcesBar } from "@/components/chat/activity/sources";
 import { citedIdsOf, linkifyCitations } from "@/lib/citations";
 import { ImageJobCard } from "@/components/image-edit/image-job-card";
@@ -553,7 +554,23 @@ function AssistantBubble({
 
   // ── Protocol v2: web activity + citations ──
   const cancelRun = useChatStore((s) => s.cancelRun);
+  const pendingApprovals = useChatStore((s) => s.pendingApprovals);
   const items = message.items ?? [];
+  const activeBrowserItemIds = new Set(
+    items
+      .filter((i) => i.kind === "browser_task")
+      .map((i) => i.id),
+  );
+  const hasRunningBrowserTask = items.some(
+    (i) => i.kind === "browser_task" && (i.status === "in_progress" || i.status === "queued"),
+  );
+  const standaloneApprovals = isStreaming
+    ? pendingApprovals.filter(
+        (a) =>
+          !(a.item_id && activeBrowserItemIds.has(a.item_id)) &&
+          !(!a.item_id && hasRunningBrowserTask),
+      )
+    : [];
   const sources = message.sources ?? [];
   const validIds = new Set<number>(sources.map((s) => s.id));
   for (const a of message.annotations ?? []) {
@@ -606,6 +623,15 @@ function AssistantBubble({
         {/* Web activity: searches, page reads, live browser */}
         {items.length > 0 && (
           <ActivityTimeline items={items} isStreaming={isStreaming} onStop={() => void cancelRun()} />
+        )}
+
+        {/* Standalone tool / vault approvals not already attached to a live browser card */}
+        {standaloneApprovals.length > 0 && (
+          <div className="space-y-2">
+            {standaloneApprovals.map((a) => (
+              <BrowserApprovalPrompt key={a.approval_id} approval={a} />
+            ))}
+          </div>
         )}
 
         {/* Final Response */}
